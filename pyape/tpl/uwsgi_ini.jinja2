@@ -1,0 +1,95 @@
+[uwsgi]
+; 当设定了 max-request 的时候，到达值后 worker 会重启
+; http://uwsgi-docs-cn.readthedocs.io/zh_CN/latest/Options.html?highlight=max-requests
+; 如果没有 master，重启将不会实现
+; http://stackoverflow.com/a/5430522/1542345
+master = true
+processes = {{processes}}
+threads = {{threads}}
+max-requests = 6000
+chmod-socket = 666
+; 惊群效应
+; http://uwsgi-docs-zh.readthedocs.io/zh_CN/latest/articles/SerializingAccept.html
+thunder-lock = true
+; 缓存支持，仅设置一个默认缓存。如果多于一个缓存，则需要调整 config.py 中的 Cache 定义
+cache2 = name=mjp,items=60,blocksize=65536,keysize=60,bitmap=1,purge_lru=0
+; 超时 20 秒结束 worker
+harakiri = 20
+harakiri-verbose = true
+
+; OSError https://stackoverflow.com/a/45393743/1542345
+ignore-sigpipe = true
+ignore-write-errors = true
+disable-write-exception = true
+
+; 使用 python 的线程支持，而不使用多进程
+; enable-threads = true
+
+; 参见 https://blog.zengrong.net/post/2614.html
+buffer-size = 32768
+
+; wsgi.file_wrapper 是WSGI标准的一个优化。在个别情况下，它会引发错误。
+; 例如，当在Python 3.5中返回一个内存中字节缓存 (io.Bytesio) 的时候。
+; 在 Python3.5 中需要将这个参数设置为 true
+; 参见 https://uwsgi-docs-zh.readthedocs.io/zh_CN/latest/ThingsToKnow.html?highlight=wsgi-disable-file-wrapper
+; File "/srv/app/mjpadm/venv/lib/python3.5/site-packages/flask/helpers.py", line 592, in send_file
+;     data = wrap_file(request.environ, file)
+; File "/srv/app/mjpadm/venv/lib/python3.5/site-packages/werkzeug/wsgi.py", line 893, in wrap_file
+;     return environ.get('wsgi.file_wrapper', FileWrapper)(file, buffer_size)
+; SystemError: <built-in function uwsgi_sendfile> returned a result with an error set
+wsgi-disable-file-wrapper = false
+
+; 在 ubuntu 下，使用 www-data 权限来执行，其他发行版请自行修改
+uid = app
+gid = app
+
+; 虚拟环境的文件夹
+venv = {{venv}}
+; 应用载入前切换到当前文件夹，否则可能导致找不到某些包，例如，找不到 wsgi.py 文件
+chdir = %d
+
+; 执行的启动文件
+wsgi-file = wsgi.py
+; 对应 wsgi.py 的同名全局变量，是一个 Flask app
+callable = mjpapp
+
+{%- if socket %}
+; 使用 nginx 转发，启动 socket 监听
+; 注意在正式服上需要打开 limit，否则会出现 nginx 499 错误
+; 建议使用 sock 文件而不要使用端口转发，若必须使用端口转发，也需要打开端口转发的 limit
+socket = {{socket}}
+{%- elif http_socket %}}
+http-socket = {{http_socket}}
+{%- else %}
+; 直接使用 uwsgi 的 http 监听服务器
+http = {{http}}
+{%- endif %}
+{%- if stats %}
+stats = {{stats}}
+{%- endif %}
+
+; 尽量使用 pidfile
+pidfile = %d%n.pid
+; 使用 master-fifo 来管理进程
+; http://uwsgi-docs-zh.readthedocs.io/zh_CN/latest/MasterFIFO.html
+master-fifo = %d%n.fifo
+
+{%- if daemonize %}
+# 使用 daemonize 将进程放到后台，可以配置一个地址，或者配置成字符串 true，结合 logto 使用
+# 如果使用了 logger 配置，那么配置了地址也不会输出
+daemonize = {{daemonize}}
+{%- endif %}
+{%- if logto %}
+logto = {{logto}}
+{%- endif %}
+{%- if req_logger %}
+# req-logger 属于插件系统，不支持 touch-reopen 或者 fifo 重新打开日志
+req-logger = {{req_logger}}
+{%- endif %}
+{%- if logger %}
+# logger 属于插件系统，不支持 touch-reopen 或者 fifo 重新打开日志
+logger = {{logger}}
+{%- endif %}
+log-master = true
+threaded-logger = true
+log-format = {"pid": %(pid), "method": "%(method)", "addr":"%(addr)", "uri": "%(uri)", "proto": "%(proto)", "status": %(status), "msecs": %(msecs), "vars": %(vars), "headers": %(headers), "pktsize": %(pktsize), "ctime": "%(ctime)", "hsize": %(hsize), "cl": %(cl), "rsize": %(rsize), "switches": %(switches), "core": %(core)}

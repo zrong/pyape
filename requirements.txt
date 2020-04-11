@@ -1,0 +1,14 @@
+Flask
+Flask-SQLAlchemy
+flask-compress
+PyMySQL
+requests
+python-dotenv
+cryptography
+attrs
+redis
+toml
+fabric
+patchwork
+python-json-logger
+pyzmq
