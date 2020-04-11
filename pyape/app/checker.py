@@ -17,7 +17,7 @@ from pyape.util.func import parse_int
 from pyape.models.regional import check_regional
 
 
-def page_checker():
+def page():
     """ @装饰器。检测 per_page 和 page，在被装饰方法中加入可用的 page 和 per_page 参数 """
 
     def decorator(f):
@@ -36,7 +36,36 @@ def page_checker():
     return decorator
 
 
-def regional_checker_gconfig(add_r=False, ignore_zero=False):
+def request_values(*request_params, defaultvalue={}, request_key='args', parse_int_params=[]):
+    """ 检测 vo 的请求值，做一些转换
+    :param request_params: 请求的键名列表
+    :param defaultvalue: 要替换的默认值，必须保证默认值是存在的
+    :param parse_int_params: 需要做 int 转换的键名列表
+    """
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_fun(*args, **kwargs):
+            rdict = get_request_values(defaultvalue=defaultvalue, request_key=request_key)
+            # kwargs2 = {}
+            try:
+                for k in request_params:
+                    if k in parse_int_params:
+                        kwargs[k] = int(rdict.get(k))
+                    else:
+                        kwargs[k] = rdict.get(k)
+            except Exception as e:
+                logger.error('vo_request_checker request_params(%s) defaultvalue:(%s) request_key(%s) error: %s',
+                    request_params, defaultvalue, request_key)
+                abort(401)
+            return f(*args, **kwargs)
+
+        return decorated_fun
+
+    return decorator
+
+
+def regional_gconfig(add_r=False, ignore_zero=False):
     """ @装饰器。 检测配置文件中是否包含需要的 regional 信息
     :param add_r: 是否传递 r 参数给被包装的方法
     :param ignore_zero: 值为真，则允许 r 值为 0。0 是一个特殊的 r 值，代表全局 r
@@ -63,7 +92,7 @@ def regional_checker_gconfig(add_r=False, ignore_zero=False):
     return decorator
 
 
-def regional_checker_gdb(add_r=False, ignore_zero=False, add_robj=False):
+def regional_gdb(add_r=False, ignore_zero=False, add_robj=False):
     """ @装饰器。检查数据库中失败包含需要的 regional
 
     :param add_r: 是否传递 r 参数给被包装的方法
@@ -91,7 +120,7 @@ def regional_checker_gdb(add_r=False, ignore_zero=False, add_robj=False):
     return decorator
 
 
-def ip_checker_gconfig():
+def ip_gconfig():
     """ 检测访问 IP 是否处于IP 地址列表中
     IPS 地址列表在配置中定义，定义到具体的 REGIONAL 中
     """
@@ -120,7 +149,7 @@ def ip_checker_gconfig():
     return decorator
 
 
-def ip_checker_gdb(use_global=False):
+def ip_gdb(use_global=False):
     """ 检测访问 IP 是否处于IP 地址列表中，从数据库中查找配置的 ips 列表
 
     :param use_global: 如果值为 True，则使用 regional 0 的 ips 配置

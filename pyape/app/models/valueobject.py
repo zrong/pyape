@@ -9,7 +9,8 @@ ValueObject 表
 import json
 import toml
 
-from sqlalchemy.sql.expression import text
+from sqlalchemy.sql.expression import text, or_
+from sqlalchemy.exc import SQLAlchemyError
 
 from pyape.app import gdb, logger
 
@@ -183,3 +184,23 @@ def get_vo_query(r, votype=None, status=None):
         cause.append(ValueObject.status == status)
     return ValueObject.query.filter(*cause).\
             order_by(ValueObject.status, ValueObject.index, ValueObject.createtime.desc())
+
+
+def get_vos_vidname(votype):
+    vos = ValueObject.query.filter_by(votype=votype, status=1).\
+        with_entities(ValueObject.vid, ValueObject.name).\
+        all()
+    return vos
+
+
+def del_vo_vidname(vid, name):
+    """ 通过 vid 或者 name 删除一个 vo
+    """
+    try:
+        ValueObject.query.filter(or_(ValueObject.vid==vid, ValueObject.name==name)).delete()
+        db.session.commit()
+    except SQLAlchemyError as e:
+        msg = 'valueobject.del_vo_vidname error: ' + str(e)
+        logger.error(msg)
+        return msg
+    return None

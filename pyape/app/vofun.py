@@ -17,37 +17,7 @@ from pyape.app.models.typeid import TypeID
 from pyape.app.re2fun import get_request_values, responseto, get_page_response
 
 
-
-def vo_request_checker(*request_params, defaultvalue={}, request_key='args', parse_int_params=[]):
-    """ 检测 vo 的请求值，做一些转换
-    :param request_params: 请求的键名列表
-    :param defaultvalue: 要替换的默认值，必须保证默认值是存在的
-    :param parse_int_params: 需要做 int 转换的键名列表
-    """
-
-    def decorator(f):
-        @wraps(f)
-        def decorated_fun(*args, **kwargs):
-            rdict = get_request_values(defaultvalue=defaultvalue, request_key=request_key)
-            # kwargs2 = {}
-            try:
-                for k in request_params:
-                    if k in parse_int_params:
-                        kwargs[k] = int(rdict.get(k))
-                    else:
-                        kwargs[k] = rdict.get(k)
-            except Exception as e:
-                logger.error('vo_request_checker request_params(%s) defaultvalue:(%s) request_key(%s) error: %s',
-                    request_params, defaultvalue, request_key)
-                abort(401)
-            return f(*args, **kwargs)
-
-        return decorated_fun
-
-    return decorator
-
-
-# @vo_request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 1, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])
+# @checker.request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 1, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])
 def valueobject_get_more(r, page, per_page, votype, status, mergevo):
     """ 分页获取指定 votype 下的 ValueObject 信息
     """
@@ -60,7 +30,7 @@ def valueobject_get_more(r, page, per_page, votype, status, mergevo):
     return responseto(data=rdata)
 
 
-# @vo_request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 0, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])
+# @checker.request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 0, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])
 def valueobject_get_all(r, votype, status, mergevo):
     """ 获取指定 votype 下所有 ValueObject 信息
     """
@@ -145,7 +115,7 @@ def _get_vo_by_cache(r, name):
     return valueobj
 
 
-# @vo_request_checker('vid', 'name', 'mergevo', defaultvalue={'mergevo': 1, 'withcache': 0}, request_key='args', parse_int_params=['mergevo', 'withcache'])
+# @checker.request_checker('vid', 'name', 'mergevo', defaultvalue={'mergevo': 1, 'withcache': 0}, request_key='args', parse_int_params=['mergevo', 'withcache'])
 def valueobject_get(r, vid, name, mergevo, withcache):
     """ 获取单个 ValueObject 信息，支持通过  vid 和 name
     """
