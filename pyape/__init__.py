@@ -3,6 +3,7 @@ __version__ = '0.1.3'
 
 from functools import wraps
 
+import sys
 import flask
 # 这里的导入目的是为了初始化，导入顺序是按照依赖顺序排列的，不可修改
 import pyape.uwsgiproxy
@@ -12,16 +13,15 @@ from pyape.config import GlobalConfig
 gconfig = None
 
 
-def init(basedir=None, init_app_method=None, cls_config=None):
+def init(gconfig, init_app_method=None, cls_config=None):
     """ 初始化 APP
-    :param basedir: 基础文件夹
+    :param gconfig: pyape.config.GlobalConfig 的实例
     :param init_app: 外部初始化方法
     :param cls_config: 一个包含自定义 Class 的 dict
         形如: {'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}
         不需要同时包含 3 个 Class
     """
-    global gconfig
-    gconfig = GlobalConfig(basedir)
+    sys.modules[__name__].__dict__['gconfig'] = gconfig
 
     flask.cli.load_dotenv()
 
@@ -41,23 +41,23 @@ def init(basedir=None, init_app_method=None, cls_config=None):
     pyape.app.init_cache(pyape_app)
     # 这个方法必须在注册蓝图前调用
     if init_app_method is not None:
-        init_app_method(pyape_app, pyape_app.gdb)
+        init_app_method(pyape_app, pyape.app.gdb)
 
     # blueprint 要 import gdb，因此要在 gdb 之后注册
     appmodules = gconfig.getcfg('PATH', 'modules')
     pyape.app.register_blueprint(pyape_app, 'app', appmodules)
+    return pyape_app
 
 
-def init_decorator(basedir=None, cls_config=None):
+def init_decorator(gconfig, cls_config=None):
     """ 初始化 APP 的装饰器版本
-    :param basedir: 基础文件夹
+    :param gconfig: pyape.config.GlobalConfig 的实例
     :param init_app: 外部初始化方法
     :param cls_config: 一个包含自定义 Class 的 dict
         形如: {'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}
         不需要同时包含 3 个 Class
     """
-    global gconfig
-    gconfig = GlobalConfig(basedir)
+    sys.modules[__name__]['gconfig'] = gconfig
 
     flask.cli.load_dotenv()
 

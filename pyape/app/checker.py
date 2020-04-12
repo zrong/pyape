@@ -14,7 +14,7 @@ from pyape.app import logger, gcache
 from pyape.app.re2fun import get_request_values
 from pyape.util.func import parse_int
 
-from pyape.models.regional import check_regional
+from pyape.app.models.regional import check_regional
 
 
 def page():

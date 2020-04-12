@@ -8,13 +8,13 @@ pyape.app.vofun
 
 from flask import abort
 
-from pyape.queryfun import commit_and_response_error
 from pyape.util.func import parse_int
 from pyape import gconfig
 from pyape.app import gdb, gcache, logger
 from pyape.app.models.valueobject import ValueObject, get_vo_query
 from pyape.app.models.typeid import TypeID
 from pyape.app.re2fun import get_request_values, responseto, get_page_response
+from pyape.app.queryfun import commit_and_response_error
 
 
 # @checker.request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 1, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])

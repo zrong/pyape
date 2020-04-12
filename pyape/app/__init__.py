@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 import importlib
 import logging
 from datetime import datetime
@@ -6,10 +7,8 @@ from functools import partial
 from decimal import Decimal
 from functools import wraps
 
-from flask import (Flask, Response, request)
 from sqlalchemy.inspection import inspect
 from flask_compress import Compress
-from werkzeug.datastructures import Headers
 from flask_sqlalchemy import SQLAlchemy
 
 from pyape import uwsgiproxy
@@ -17,6 +16,7 @@ from pyape import gconfig, errors
 from pyape.cache import GlobalCache
 from pyape.logging import get_logging_handler, get_pyzog_handler
 from pyape.flask_redis import FlaskRedis
+from pyape.flask_extend import PyapeFlask, PyapeResponse, FlaskConfig
 
 
 # 全局的数据库引用，保存的是 PyapeDB 的实例
@@ -160,94 +160,6 @@ class PyapeRedis(FlaskRedis):
             bind_key_redis = robj.get('bind_key_redis')
             clients[r] = rc_clients[bind_key_redis]
         return clients
-
-
-class PyapeResponse(Response):
-    """ 自定义的响应，为所有的响应头加入跨域信息 """
-
-    def __init__(self,
-        response=None,
-        status=None,
-        headers=None,
-        mimetype=None,
-        content_type=None,
-        direct_passthrough=False):
-        # 跨域控制 
-        # https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS
-        origin = ('Access-Control-Allow-Origin', '*')
-        methods = ('Access-Control-Allow-Methods', 'HEAD, OPTIONS, GET, POST, PUT')
-        allow_headers = ('Access-Control-Allow-Headers', 'MJST, Content-Type')
-        if headers:
-            headers.add(*origin)
-            headers.add(*methods)
-            headers.add(*allow_headers)
-        else:
-            headers = Headers([origin, methods, allow_headers])
-        super().__init__(response=response,
-            status=status,
-            headers=headers,
-            mimetype=mimetype,
-            content_type=content_type,
-            direct_passthrough=direct_passthrough)
-
-
-class PyapeFlask(Flask):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def log_exception(self, exc_info):
-        """...description omitted..."""
-        self.logger.error('%s', dict(
-                method=request.method,
-                path=request.path,
-                ip=request.remote_addr,
-                agent_platform=request.user_agent.platform,
-                agent_browser=request.user_agent.browser,
-                agent_browser_version=request.user_agent.version,
-                agent=request.user_agent.string,
-            ), exc_info=exc_info
-        )
-
-
-class FlaskConfig(object):
-    """ flask.config.from_object 不支持 dict，因此建立这个 class
-
-    Flask_sqlalchemy 2.4 开始将下面的配置标记为过期，并在 3.0 移除
-
-    SQLALCHEMY_NATIVE_UNICODE
-    SQLALCHEMY_POOL_SIZE
-    SQLALCHEMY_POOL_TIMEOUT
-    SQLALCHEMY_POOL_RECYCLE
-    SQLALCHEMY_MAX_OVERFLOW
-    SQLALCHEMY_ENGINE_OPTIONS
-
-    改为使用 SQLALCHEMY_ENGINE_OPTIONS 这个 dict
-    """
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_timeout': 10,
-        'pool_recycle': 3600,
-    }
-
-    # ALLOWED_EXTENSIONS = set([])
-    BOOTSTRAP_SERVE_LOCAL = True
-    LOGGER_HANDLER_POLICY = 'never'
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_COMMIT_ON_TEARDOWN = True
-
-    def __init__(self, cfgdef=None):
-        if cfgdef:
-            self.from_object(cfgdef)
-        self.check_must_keys()
-
-    def check_must_keys(self):
-        for key in ('SECRET_KEY', 'SQLALCHEMY_DATABASE_URI'):
-            if getattr(self, key, None) is None:
-                raise ValueError('No ' + key)
-
-    def from_object(self, obj):
-        for key, value in obj.items():
-            setattr(self, key, value)
 
 
 def init_db(pyape_app):
