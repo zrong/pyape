@@ -6,50 +6,34 @@ pyape.app.rfun
 对 Regional 的操作封装
 """
 
+from datetime import datetime, timezone
+
 import toml
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.expression import or_
 
-from pyape.app.re2fun import get_request_values, responseto
+from pyape.app.re2fun import get_request_values, responseto, get_page_response
 from pyape.app.queryfun import commit_and_response_error
 from pyape.app import gdb, logger
 from pyape.util.func import parse_int
 
-from pyape.app.models.valueobject import ValueObject, get_vos_vidname, del_vo_vidname
 from pyape.app.models.regional import Regional
+from pyape.app.models.valueobject import ValueObject
 
 
-def regional_loginkey_get_all():
-    """ 获得所有可用的 loginkey 的名称和编号
+def regional_get_more(page, per_page, kindtype, status, merge):
+    """ 分页获取指定 votype 下的 ValueObject 信息
     """
-    vos = get_vos_vidname(501)
-    return responseto(loginkeys=vos, code=200)
+    if merge > 0:
+        return_method = lambda vos: [vo.merge_value() for vo in vos] 
+    else:
+        return_method = 'model'
+    qry = Regional.get_qry(kindtype=kindtype, status=status)
+    rdata = get_page_response(qry, page, per_page, 'regionals', return_method)
+    return responseto(data=rdata)
 
 
-def regional_loginkey_add(names, value):
-    """ 增加一个 loginkey
-    """
-    if name is None or value is None:
-        return responseto('Param please!', code=401)
-    robj = ValueObject(r=0, votype=501, name=name, value=value, status=1)
-    resp = commit_and_response_error(robj, refresh=True)
-    if resp is not None:
-        return resp
-    return responseto(loginkey={'vid':robj.vid, 'name':robj.name}, code=200)
-
-
-def regional_loginkey_del(vid, name):
-    """  删除一个 loginkey
-    """
-    if vid is None and name is None:
-        return responseto('Param please!', code=401)
-    msg = del_vo_vidname(vid, name)
-    if msg is not None:
-        return responseto(msg, code=500)
-    return responseto(code=200)
-    
-
-def regional_get(r, mergevo):
+def regional_get(r, merge):
     """ 获得一个 regional 项目
     :param mergevo: 若 mergevo 为 0，则直接返回原始数据；
                     若 mergevo 为 1，执行 Regional 中的 mergevo 方法
@@ -60,72 +44,73 @@ def regional_get(r, mergevo):
     if robj is None:
         return responseto('No regional %s!' % r, code=404)
 
-    logger.info('mergevo %s', mergevo)
-    if mergevo == 1:
+    if merge > 0:
         return responseto(regional=robj.merge_value(), code=200)
     return responseto(regional=robj, code=200)
 
 
-def regional_get_all(type_):
+def regional_get_all(kindtype, rtype, merge):
     """ 获得多个 regional 项目
-    与 /cf/regional/all/ 不同的是，这里获取的直接是数据库项目内容，value 是 TOML 字符串
     """
-    if type_ is None:
-        return responseto(regionals=Regional.query.all(), code=200)
-    if not type_ in Regional.REGIONAL_TYPES:
-        return responseto('The type of regional %s is unavailable!' % type_, code=401)
-    return responseto(regionals=Regional.get_all_by_type_qry(type_).all(), code=200)
+    rtype = parse_int(rtype)
+    kindtype = parse_int(kindtype)
+
+    if rtype is not None:
+        if not rtype in Regional.REGIONAL_TYPES:
+            return responseto('The rtype of regional %s is unavailable!' % rtype, code=401)
+
+    regionals = Regional.get_qry(kindtype=kindtype, rtype=rtype).all()
+    if merge > 0:
+        regionals = [regional.merge_value() for regional in regionals] 
+    return responseto(regionals=regionals, code=200)
 
 
-def regional_get_all_trim(type_, format_):
+def regional_get_all_trim(kindtype, rtype, rformat):
     """ 获得多个 regional 项目，仅包含 r 和 name
 
-    :param type: 1000/2000/5000
-    :param format: 0 代表返回 json 格式的 list，1 代表仅仅返回 r 的 list
+    :param kindtype:
+    :param rtype: 1000/2000/5000
+    :param rformat: 0 代表返回 json 格式的 list，1 代表仅仅返回 r 的 list
     """
-    qry = None
-    if type_ is None:
-        qry = Regional.query
-    else:
-        if not type_ in Regional.REGIONAL_TYPES:
-            return responseto('The type of regional %s is unavailable!' % type_, code=401)
-        qry = Regional.get_all_by_type_qry(type_)
-    regionals = qry.filter_by(status=1).with_entities(Regional.r, Regional.name, Regional.createtime).all()
-    if format_ == 1:
+    if rtype is not None and not rtype in Regional.REGIONAL_TYPES:
+        return responseto('The rtype of regional %s is unavailable!' % rtype, code=401)
+    qry = Regional.get_qry(kindtype=kindtype, rtype=rtype, status=1)
+    regionals = qry.with_entities(Regional.r, Regional.name, Regional.createtime).all()
+    if rformat == 1:
         regionals = [ritem.r for ritem in regionals]
     return responseto(regionals=regionals, code=200)
 
 
-def regional_add(r, name, value, loginkey, kindtype, status):
+def regional_add(r, name, value, kindtype, status):
     """ 增加一个 regional
     """
-    if r is None or name is None or value is None or loginkey is None or pftype is None:
+    if r is None or name is None or value is None:
         return responseto('Param please!', code=401)
+    kindtype = parse_int(kindtype, 0)
     try:
         toml.loads(value)
     except toml.TomlDecodeError as e:
         msg = 'value is not a TOML string: %s' % str(e)
         logger.error(msg)
         return responseto(msg, code=401)
-    if ValueObject.query.get(loginkey) is None:
-        return responseto('No loginkey %s!' % loginkey, code=401)
 
-    robj = Regional(r=r, name=name, value=value, status=status, loginkey=loginkey, kindtype=kindtype)
+    robj = Regional(r=r, name=name, value=value, status=status, kindtype=kindtype, updatetime=datetime.now(timezone.utc))
     resp = commit_and_response_error(robj, refresh=True)
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
     
 
-def regional_edit(r, name, value, loginkey, kindtype, status):
+def regional_edit(r, name, value, kindtype, status):
     """ 修改一个 regional
     """
     status = parse_int(status, 1)
-    loginkey = parse_int(loginkey)
     kindtype = parse_int(kindtype)
     if r is None:
         return responseto('Param please!', code=401)
     robj = Regional.query.get(r)
+    if robj is None:
+        return responseto('找不到 regional %s!' % r, code=404)
     if name is not None:
         robj.name = name
     if value is not None:
@@ -136,14 +121,11 @@ def regional_edit(r, name, value, loginkey, kindtype, status):
             msg = 'value is not a TOML string: %s' % str(e)
             logger.error(msg)
             return responseto(msg, code=401)
-    if loginkey is not None:
-        if ValueObject.query.get(loginkey) is None:
-            return responseto('No loginkey %s!' % loginkey, code=401)
-        robj.loginkey = loginkey
     if kindtype is not None:
         robj.kindtype = kindtype
     if status is not None:
         robj.status = status
+    robj.updatetime = datetime.now(timezone.utc)
     resp = commit_and_response_error(robj, refresh=True)
     if resp is not None:
         return resp
@@ -160,9 +142,9 @@ def regional_del(r):
         return responseto('Please delete valueobjet of %s first!' % r, code=403)
     try:
         Regional.query.filter_by(r=r).delete()
-        db.session.commit()
+        gdb.session.commit()
     except SQLAlchemyError as e:
-        msg = 'regiona_del error: ' + str(e)
+        msg = 'regional_del error: ' + str(e)
         logger.error(msg)
         return responseto(msg, code=500)
     return responseto(code=200)

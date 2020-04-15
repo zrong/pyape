@@ -5,11 +5,14 @@ pyape.app.models.regional
 
 Regional 表
 """
+from datetime import datetime, timezone
 
 import toml
 from sqlalchemy.sql.expression import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from pyape.app import gdb, logger
+from pyape.app.queryfun import commit_and_response_error
 from pyape.config import RegionalConfig
 from pyape.util.func import parse_int
 
@@ -29,10 +32,7 @@ class Regional(gdb.Model):
     name = gdb.Column(gdb.VARCHAR(100), nullable=False)
 
     # Regional 的具体配置， TOML 字符串
-    value = gdb.Column(gdb.TEXT, nullable=False)
-
-    # 用于这个 Regional 登录时候使用的加密秘钥编号。编号就是 Valueobject 的 vid
-    secretvid = gdb.Column(gdb.SMALLINT, nullable=False, index=True)
+    value = gdb.Column(gdb.TEXT, nullable=True)
 
     # 对 regional 的一种分类法，其值应为 typeid
     kindtype = gdb.Column(gdb.SMALLINT, nullable=False, index=True)
@@ -40,9 +40,10 @@ class Regional(gdb.Model):
     # Regional 的状态，值为在 TypeID 中的整数，1正常，5 禁用
     status = gdb.Column(gdb.SMALLINT, nullable=False, default=1)
 
-    createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('NOW()'))
-    updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True,
-                           server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
+    createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('CURRENT_TIMESTAMP'))
+    # updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True,
+    #                        server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
+    updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True)
 
     @staticmethod
     def r2type(r):
@@ -57,14 +58,27 @@ class Regional(gdb.Model):
         return None
 
     @classmethod
-    def get_all_by_type_qry(cls, type_):
-        """ 根据 type 查询 r 的列表，返回一个查询对象
+    def get_qry(cls, kindtype=None, rtype=None, status=None):
+        """ 获取排序过的 Regional 项目，可以根据 kindtype/rtype/status 筛选
+        :param kindtype:
+        :param rtype:
+        :param status:
+        :return:
         """
-        if type_ == 1000:
-            return cls.query.filter(cls.r.between(1000, 1999))
-        elif type_ == 2000:
-            return cls.query.filter(cls.r.between(2000, 2999))
-        return cls.query.filter(cls.r.between(5000, 5999))
+        cause = []
+        if kindtype is not None:
+            cause.append(cls.kindtype == kindtype)
+        if status is not None:
+            cause.append(cls.status == status)
+        if rtype is not None:
+            if rtype == 1000:
+                cause.append(cls.r.between(1000, 1999))
+            elif rtype == 2000:
+                cause.append(cls.r.between(2000, 2999))
+            else:
+                cause.append(cls.r.between(5000, 5999))
+        return cls.query.filter(*cause).\
+                order_by(cls.status, cls.createtime.desc())
 
     def merge_value(self):
         """ 合并数据库中的其他字段到 value 配置中
@@ -74,7 +88,6 @@ class Regional(gdb.Model):
             parsed_dict = toml.loads(self.value)
         parsed_dict['name'] = self.name
         parsed_dict['r'] = self.r
-        parsed_dict['secretvid'] = self.secretvid
         parsed_dict['kindtype'] = self.kindtype
         parsed_dict['status'] = self.status
         parsed_dict['createtime'] = self.createtime.isoformat()
@@ -93,10 +106,6 @@ def get_regional_config(status=None):
     regional_list = [ritem.merge_value() for ritem in qry.all()]
     # logger.info('regionals %s', regional_list)
     return RegionalConfig(regional_list)
-
-
-def get_regional(r, *args):
-    ritem = Regional.query.filter_by(status=1).first()
 
 
 def check_regional(r, ignore_zero=False):
@@ -128,3 +137,14 @@ def check_regionals(rs, ignore_zero=False):
             return True
     regionals = Regional.query.filter_by(status=1).filter(Regional.r.in_(rs)).all()
     return len(regionals) == lenrs
+
+
+def init_regional():
+    """ 初始化 regional0 这是必须存在的一条
+    """
+    r0 = Regional.query.get(0)
+    if r0 is None:
+        r0 = Regional(r=0, name='0', kindtype=0, status=1, updatetime=datetime.now(timezone.utc))
+        resp = commit_and_response_error(r0)
+        if resp is not None:
+            raise SQLAlchemyError('Init regional table error!')

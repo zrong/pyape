@@ -63,7 +63,7 @@ class PyapeResponse(Response):
             direct_passthrough=direct_passthrough)
     
     @property
-    def cros_config(self):
+    def cors_config(self):
         """ 子类覆盖该方法，实现跨域
         例如：
         >>> @property

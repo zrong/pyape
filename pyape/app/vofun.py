@@ -6,6 +6,7 @@ pyape.app.vofun
 对 ValueObject 的操作封装
 """
 
+from datetime import datetime, timezone
 from flask import abort
 
 from pyape.util.func import parse_int
@@ -40,67 +41,6 @@ def valueobject_get_all(r, votype, status, mergevo):
     return responseto(vos=vos)
 
 
-def valueobject_save(r, value, vid=None, name=None, votype=None, status=None, index=None, note=None, valuetype=None):
-    """ 保存一个 VO ，支持增加和更新
-    """
-    if vid is not None:
-        vid = parse_int(vid)
-        if vid is None:
-            return dict(message='vid 必须是整数!', code=401, error=True)
-    if status is not None:
-        status = parse_int(status)
-        if status is None:
-            return dict(message='status 必须是整数!', code=401, error=True)
-    if index is not None:
-        index = parse_int(index)
-    if isinstance(value, str):
-        # 检测字符串是否正常解析
-        vobj = ValueObject.load_value(value, valuetype)
-        if vobj is None:
-            return dict(message='value 无法正常解析！请检查。', code=401, error=True)
-    else:
-        value = ValueObject.dump_value(value, valuetype)
-    voitem = None
-    if vid is not None:
-        # 提供 vid 代表是修改 vo
-        voitem = ValueObject.query.get(vid)
-        if not voitem:
-            return dict(message='找不到 vid 为 %s 的纪录!' % vid, code=404, error=True)
-    elif name is not None:
-        # 没有提供 vid 但提供了 name 也代表是修改 vo
-        voitem = ValueObject.query.filter_by(name=name).first()
-    if voitem is not None:
-        # 只有明确提供了 status 才设置它
-        # 不处理 votype/r ，因为已经创建了的 VO 不允许修改这些关键分类的值
-        if name is not None:
-            voitem.name = name
-        if status is not None:
-            voitem.status = status
-        if note is not None:
-            voitem.note = note
-        if index is not None:
-            voitem.index = index
-    else:
-        # 找不到 voitem，代表新增 vo。必须提供 votype 和 name
-        if name is None:
-            return dict(message='name please!', code=401, error=True)
-        votype = parse_int(votype)
-        if votype is None:
-            return dict(message='请提供 votype!', code=401, error=True)
-        voitem = ValueObject(name=name,
-            status=status if status is not None else 1,
-            index=index if index is not None else 0,
-            r=r,
-            votype=votype,
-            note=note)
-    # vo已经是检测过的字符串了
-    voitem.value = value
-
-    resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
-    if resp is not None:
-        return resp
-    return dict(vo=gdb.to_response_data(voitem), error=False, code=200)
-
 
 def _get_vo_by_cache(r, name):
     """ 从缓存中查询 vo 的 value
@@ -120,6 +60,7 @@ def valueobject_get(r, vid, name, mergevo, withcache):
     """ 获取单个 ValueObject 信息，支持通过  vid 和 name
     """
     if withcache > 0:
+        # 如果使用 withcache，必须提供 name
         if name is None:
             return responseto('请提供 name!', code=401)
         value_in_cache = _get_vo_by_cache(r, name)
@@ -142,29 +83,118 @@ def valueobject_get(r, vid, name, mergevo, withcache):
     return responseto(vo=vo)
 
 
-def valueobject_set(r, vodict, withcache):
-    """ 增加或者编辑 ValueObject 信息
+def valueobject_add(r, withcache, name, value, votype, status=None, index=None, note=None, valuetype=None):
+    """ 增加一个 VO
     """
-    rdata = valueobject_save(r, **vodict)
-    if rdata.get('error'):
-        return responseto(data=rdata)
-    # 将 valueobj 写入缓存
+    if name is None or value is None or votype is None:
+        return responseto(message='必须提供 name/value/votype!', code=401, error=True)
+    if status is not None:
+        status = parse_int(status)
+        if status is None:
+            return responseto(message='status 必须是整数!', code=401, error=True)
+    if index is not None:
+        index = parse_int(index)
+    if isinstance(value, str):
+        # 检测字符串是否正常解析
+        vobj = ValueObject.load_value(value, valuetype)
+        if vobj is None:
+            return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
+    else:
+        value = ValueObject.dump_value(value, valuetype)
+
+    votype = parse_int(votype)
+    if votype is None:
+        return responseto(message='请提供 votype!', code=401, error=True)
+
+    voitem = ValueObject(name=name,
+        value=value,
+        status=status if status is not None else 1,
+        index=index if index is not None else 0,
+        r=r,
+        votype=votype,
+        updatetime=datetime.now(timezone.utc),
+        note=note)
+
+    resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
+    if resp is not None:
+        return resp
+
     if withcache > 0:
-        valueobj = ValueObject.load_value(rdata['vo']['value'])
-        gcache.setg(rdata['vo']['name'], valueobj, r)
-    return responseto(data=rdata)
+        valueobj = ValueObject.load_value(value)
+        gcache.setg(name, valueobj, r)
+    return responseto(vo=voitem, error=False, code=200)
+
+
+def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None, status=None, index=None, note=None, valuetype=None):
+    """ 更新一个 VO
+    """
+    if vid is not None:
+        vid = parse_int(vid)
+        if vid is None:
+            return responseto(message='vid 必须是整数!', code=401, error=True)
+
+    if status is not None:
+        status = parse_int(status)
+        if status is None:
+            return responseto(message='status 必须是整数!', code=401, error=True)
+
+    if index is not None:
+        index = parse_int(index)
+
+    if isinstance(value, str):
+        # 检测字符串是否正常解析
+        vobj = ValueObject.load_value(value, valuetype)
+        if vobj is None:
+            return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
+
+    voitem = None
+    if vid is not None:
+        # 提供 vid 代表是修改 vo
+        voitem = ValueObject.query.get(vid)
+    elif name is not None:
+        # 没有提供 vid 但提供了 name 也代表是修改 vo
+        voitem = ValueObject.query.filter_by(name=name).first()
+
+    if voitem is None:
+        return responseto(message='找不到 vo!', code=404, error=True)
+
+    voitem.updatetime = datetime.now(timezone.utc)
+
+    # 只有明确提供了 status 才设置它
+    # 不处理 votype/r ，因为已经创建了的 VO 不允许修改这些关键分类的值
+    if name is not None:
+        voitem.name = name
+    if value is not None:
+        voitem.value = value
+    if status is not None:
+        voitem.status = status
+    if note is not None:
+        voitem.note = note
+    if index is not None:
+        voitem.index = index
+    if votype is not None:
+        voitem.votype = votype
+
+    resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
+    if resp is not None:
+        return resp
+
+    if withcache > 0:
+        valueobj = ValueObject.load_value(value)
+        gcache.setg(name, valueobj, r)
+    return responseto(vo=voitem, error=False, code=200)
 
 
 def valueobject_del(vid, name):
     """ 删除一个 vo，优先使用 vid，然后考虑 name
     """
     vo = None
+
     if vid is not None:
         vo = ValueObject.query.get(vid)
     elif name is not None:
         vo = ValueObject.query.filter_by(name=name).first()
-    else:
-        return responseto('vid or name please!', code=401)
+
     if vo is None:
         return responseto('no vo like this.', code=404)
 
@@ -177,14 +207,6 @@ def valueobject_del(vid, name):
     gcache.delg(name, r)
 
     return responseto()
-
-
-def update_cache_all(votype):
-    """ 数据库中配置信息更新，需要更新所有的数据库
-    """
-    if gconfig.regional_ids:
-        for r in config.regional_ids:
-            update_cache(votype, r)
 
 
 def update_cache(votype, r):

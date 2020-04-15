@@ -40,9 +40,10 @@ class ValueObject(gdb.Model):
     # VO 是 1启用 还是 5禁用
     status = gdb.Column(gdb.SMALLINT, index=True, nullable=False, default=1)
 
-    createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('NOW()'))
-    updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True,
-                           server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
+    createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('CURRENT_TIMESTAMP'))
+    # updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True,
+    #                        server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
+    updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True)
 
     # 说明字段
     note = gdb.Column(gdb.VARCHAR(512), nullable=True)
@@ -85,7 +86,7 @@ class ValueObject(gdb.Model):
             try:
                 return json.loads(value)
             except Exception as e:
-                logger.error('ValueObject.load_value, value is not json: %s', e)
+                logger.warning('ValueObject.load_value, value is not json: %s', e)
                 try:
                     return toml_loads(value)
                 except Exception:
@@ -119,31 +120,29 @@ class ValueObject(gdb.Model):
         # logger.info('get_value %s', valueobj)
         return valueobj
 
-    def mergevo(self, includes=['votype', 'time', 'note', 'status'], type_=None):
+    def mergevo(self, includes=['votype', 'createtime', 'updatetime', 'note', 'status'], type_=None):
         """
         将 ValueObject 对象转换成为一个 dict ，合并 createtime/updatetime/vid/typeid 到 value 代表的 JSON 对象中
         :param includes: 需要包含的字段
         :return:
         """
         voobj = self.get_value(type_)
-        if voobj is None:
+        if isinstance(voobj, dict):
+            pass
+        elif voobj is None:
             voobj = {}
-        elif isinstance(voobj, list):
+        else:
             voobj = {'value': voobj}
         voobj['vid'] = self.vid
         voobj['name'] = self.name
         voobj['index'] = self.index
         if includes:
-            for item in includes:
-                if item == 'votype':
-                    voobj['votype'] = self.votype
-                elif item == 'time':
-                    voobj['createtime'] = self.createtime.isoformat()
-                    voobj['updatetime'] = self.updatetime.isoformat()
-                elif item == 'note':
-                    voobj['note'] = self.note
-                elif item == 'status':
-                    voobj['status'] = self.status
+            for k in includes:
+                try:
+                    v = getattr(self, k)
+                    voobj[k] = v
+                except AttributeError:
+                    pass
         return voobj
 
 
@@ -204,3 +203,7 @@ def del_vo_vidname(vid, name):
         logger.error(msg)
         return msg
     return None
+
+
+def init_valueobject():
+    pass

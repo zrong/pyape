@@ -51,12 +51,12 @@ def request_values(*request_params, defaultvalue={}, request_key='args', parse_i
             try:
                 for k in request_params:
                     if k in parse_int_params:
-                        kwargs[k] = int(rdict.get(k))
+                        kwargs[k] = parse_int(rdict.get(k))
                     else:
                         kwargs[k] = rdict.get(k)
             except Exception as e:
-                logger.error('vo_request_checker request_params(%s) defaultvalue:(%s) request_key(%s) error: %s',
-                    request_params, defaultvalue, request_key)
+                logger.error('checker.request_values request_params(%s) defaultvalue:(%s) request_key(%s) error: %s',
+                    request_params, defaultvalue, request_key, e)
                 abort(401)
             return f(*args, **kwargs)
 
