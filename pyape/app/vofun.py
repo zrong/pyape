@@ -18,12 +18,12 @@ from pyape.app.re2fun import get_request_values, responseto, get_page_response
 from pyape.app.queryfun import commit_and_response_error
 
 
-# @checker.request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 1, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])
-def valueobject_get_more(r, page, per_page, votype, status, mergevo):
+# @checker.request_checker('votype', 'status', 'merge', defaultvalue={'merge': 1, 'status': 1}, request_key='args', parse_int_params=['merge', 'status', 'votype'])
+def valueobject_get_more(r, page, per_page, votype, status, merge):
     """ 分页获取指定 votype 下的 ValueObject 信息
     """
-    if mergevo > 0:
-        return_method = lambda vos: [vo.mergevo() for vo in vos] 
+    if merge > 0:
+        return_method = lambda vos: [vo.merge() for vo in vos] 
     else:
         return_method = 'model'
     qry = get_vo_query(r, votype, status)
@@ -31,13 +31,13 @@ def valueobject_get_more(r, page, per_page, votype, status, mergevo):
     return responseto(data=rdata)
 
 
-# @checker.request_checker('votype', 'status', 'mergevo', defaultvalue={'mergevo': 0, 'status': 1}, request_key='args', parse_int_params=['mergevo', 'status', 'votype'])
-def valueobject_get_all(r, votype, status, mergevo):
+# @checker.request_checker('votype', 'status', 'merge', defaultvalue={'merge': 0, 'status': 1}, request_key='args', parse_int_params=['merge', 'status', 'votype'])
+def valueobject_get_all(r, votype, status, merge):
     """ 获取指定 votype 下所有 ValueObject 信息
     """
     vos = get_vo_query(r, votype, status).all()
-    if mergevo > 0:
-        return responseto(vos=[vo.mergevo() for vo in vos])
+    if merge > 0:
+        return responseto(vos=[vo.merge() for vo in vos])
     return responseto(vos=vos)
 
 
@@ -55,8 +55,8 @@ def _get_vo_by_cache(r, name):
     return valueobj
 
 
-# @checker.request_checker('vid', 'name', 'mergevo', defaultvalue={'mergevo': 1, 'withcache': 0}, request_key='args', parse_int_params=['mergevo', 'withcache'])
-def valueobject_get(r, vid, name, mergevo, withcache):
+# @checker.request_checker('vid', 'name', 'merge', defaultvalue={'merge': 1, 'withcache': 0}, request_key='args', parse_int_params=['merge', 'withcache'])
+def valueobject_get(r, vid, name, merge, withcache):
     """ 获取单个 ValueObject 信息，支持通过  vid 和 name
     """
     if withcache > 0:
@@ -78,8 +78,8 @@ def valueobject_get(r, vid, name, mergevo, withcache):
         return responseto('vid or name please!', code=401)
     if vo is None:
         return responseto('no vo like this.', code=404)
-    if mergevo > 0:
-        vo = vo.mergevo()
+    if merge > 0:
+        vo = vo.merge()
     return responseto(vo=vo)
 
 

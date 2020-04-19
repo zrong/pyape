@@ -40,16 +40,17 @@ class PyapeDB(SQLAlchemy):
         # 保存根据 regional 进行分类的表定义
         self.__regional_tables = {}
 
-    def build_regional_tables(self, name, build_table_method):
+    def build_regional_tables(self, name, build_table_method, rconfig):
         """ 根据 regionals 的配置创建多个表
         :param name: 表的名称前缀
         :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class
+        :param rconfig: RegionalConfig 的实例
         """
         tables = self.__regional_tables.get(name)
         if tables is None:
             tables = {}
             self.__regional_tables[name] = tables
-        for regional in gconfig.regional_list:
+        for regional in rconfig.rlist:
             r = regional.get('r')
 
             # 避免重复建立表
@@ -60,18 +61,27 @@ class PyapeDB(SQLAlchemy):
             bind_key = regional.get('bind_key_db')
             Cls = build_table_method(name + str(r), bind_key=bind_key)
             tables[r] = Cls
+        # logger.info('build_regional_tables %s', tables)
 
-    def get_regional_table(self, name, r):
+    def get_regional_table(self, name, r, build_table_method, rconfig):
         """ 根据 regionals 和表名称前缀获取一个动态创建的表
         :param name: 表的名称前缀
         :param r: regional
+        :param rconfig: RegionalConfig 的实例
         """
-        if not r in gconfig.regional_ids:
+        if not r in rconfig.rids:
             raise ValueError('get_regional_table: No regional %s' % r)
         tables = self.__regional_tables.get(name)
+        Cls = None
         if isinstance(tables, dict):
-            return tables.get(r)
-        return None
+            Cls = tables.get(r)
+        if Cls is None:
+            # 可能存在更新了 regional 之后，没有更新 tables 的情况，这里要更新一次。
+            # 每个进程都需要更新，但每次调用可能仅发生在其中一个进程。因此必须在每次调用的时候都检测更新。
+            self.build_regional_tables(name, build_table_method, gconfig)
+            return self.__regional_tables.get(name)
+        # logger.info('get_regional_table %s', Cls)
+        return Cls
 
     def ismodel(self, instance):
         """ 判断一个实例是否是 gdb.Model 的实例

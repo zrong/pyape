@@ -120,7 +120,7 @@ class ValueObject(gdb.Model):
         # logger.info('get_value %s', valueobj)
         return valueobj
 
-    def mergevo(self, includes=['votype', 'createtime', 'updatetime', 'note', 'status'], type_=None):
+    def merge(self, includes=['votype', 'createtime', 'updatetime', 'note', 'status'], type_=None):
         """
         将 ValueObject 对象转换成为一个 dict ，合并 createtime/updatetime/vid/typeid 到 value 代表的 JSON 对象中
         :param includes: 需要包含的字段
@@ -158,7 +158,7 @@ def get_vo_by_fullname(fullname, type_=None, merge=None):
     vo = ValueObject.query.filter_by(name=fullname, status=1).first()
     if vo is not None:
         if isinstance(merge, list):
-            return vo.mergevo(merge, type_)
+            return vo.merge(merge, type_)
         return vo.get_value(type_)
     return None
 
@@ -197,7 +197,7 @@ def del_vo_vidname(vid, name):
     """
     try:
         ValueObject.query.filter(or_(ValueObject.vid==vid, ValueObject.name==name)).delete()
-        db.session.commit()
+        gdb.session.commit()
     except SQLAlchemyError as e:
         msg = 'valueobject.del_vo_vidname error: ' + str(e)
         logger.error(msg)

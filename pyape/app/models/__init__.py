@@ -7,13 +7,8 @@ pyape.app.models
 """
 
 from .typeid import TypeID
-from .regional import init_regional
-from .valueobject import init_valueobject
-
-
-def init_models():
-    """ 初始化 models
-    执行所有 models 的初始化数据库的方法
-    """
-    init_regional()
-    init_valueobject()
+from .regional import Regional, init_regional, get_regional_config
+from .valueobject import ValueObject, init_valueobject
+from .account import Account, init_account
+from .user import make_user_model, init_user
+from .role import Role, UserRole, init_userrole

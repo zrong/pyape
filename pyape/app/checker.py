@@ -168,7 +168,7 @@ def ip_gdb(use_global=False):
                 abort(403)
 
             ip = request.remote_addr
-            ips = robj.merge_value().get('ips')
+            ips = robj.merge().get('ips')
             # logger.info('@ip_checker_gdb ip: %s, ips: %s', ip, ips)
             if isinstance(ips, list) and not ip in ips:
                 logger.error('@ip_checker_gdb IP %s is not in %s.', ip, ips)

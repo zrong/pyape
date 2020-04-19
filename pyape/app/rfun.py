@@ -25,7 +25,7 @@ def regional_get_more(page, per_page, kindtype, status, merge):
     """ 分页获取指定 votype 下的 ValueObject 信息
     """
     if merge > 0:
-        return_method = lambda vos: [vo.merge_value() for vo in vos] 
+        return_method = lambda vos: [vo.merge() for vo in vos] 
     else:
         return_method = 'model'
     qry = Regional.get_qry(kindtype=kindtype, status=status)
@@ -35,8 +35,8 @@ def regional_get_more(page, per_page, kindtype, status, merge):
 
 def regional_get(r, merge):
     """ 获得一个 regional 项目
-    :param mergevo: 若 mergevo 为 0，则直接返回原始数据；
-                    若 mergevo 为 1，执行 Regional 中的 mergevo 方法
+    :param merge: 若 merge 为 0，则直接返回原始数据；
+                    若 merge 为 1，执行 Regional 中的 merge 方法
     """
     if r is None:
         return responseto('Param please!', code=401)
@@ -45,7 +45,7 @@ def regional_get(r, merge):
         return responseto('No regional %s!' % r, code=404)
 
     if merge > 0:
-        return responseto(regional=robj.merge_value(), code=200)
+        return responseto(regional=robj.merge(), code=200)
     return responseto(regional=robj, code=200)
 
 
@@ -61,7 +61,7 @@ def regional_get_all(kindtype, rtype, merge):
 
     regionals = Regional.get_qry(kindtype=kindtype, rtype=rtype).all()
     if merge > 0:
-        regionals = [regional.merge_value() for regional in regionals] 
+        regionals = [regional.merge() for regional in regionals] 
     return responseto(regionals=regionals, code=200)
 
 

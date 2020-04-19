@@ -80,7 +80,7 @@ class Regional(gdb.Model):
         return cls.query.filter(*cause).\
                 order_by(cls.status, cls.createtime.desc())
 
-    def merge_value(self):
+    def merge(self):
         """ 合并数据库中的其他字段到 value 配置中
         """
         parsed_dict = {}
@@ -103,8 +103,7 @@ def get_regional_config(status=None):
     qry = Regional.query
     if isinstance(status, int):
         qry = qry.filter_by(status=status)
-    regional_list = [ritem.merge_value() for ritem in qry.all()]
-    # logger.info('regionals %s', regional_list)
+    regional_list = [ritem.merge() for ritem in qry.all()]
     return RegionalConfig(regional_list)
 
 
@@ -143,8 +142,10 @@ def init_regional():
     """ 初始化 regional0 这是必须存在的一条
     """
     r0 = Regional.query.get(0)
-    if r0 is None:
-        r0 = Regional(r=0, name='0', kindtype=0, status=1, updatetime=datetime.now(timezone.utc))
-        resp = commit_and_response_error(r0)
-        if resp is not None:
-            raise SQLAlchemyError('Init regional table error!')
+    if r0 is not None:
+        raise TypeError('The regional 0 is exists!')
+
+    r0 = Regional(r=0, name='0', kindtype=0, status=1, updatetime=datetime.now(timezone.utc))
+    resp = commit_and_response_error(r0, return_dict=True)
+    if resp is not None:
+        raise SQLAlchemyError('Init regional table error: %s' % resp['message'])
