@@ -6,7 +6,7 @@ pyape.app.rfun
 对 Regional 的操作封装
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import toml
 from sqlalchemy.exc import SQLAlchemyError
@@ -81,7 +81,7 @@ def regional_get_all_trim(kindtype, rtype, rformat):
     return responseto(regionals=regionals, code=200)
 
 
-def regional_add(r, name, value, kindtype, status):
+def regional_add(r, name, value, kindtype, status, offset=0):
     """ 增加一个 regional
     """
     if r is None or name is None or value is None:
@@ -94,14 +94,14 @@ def regional_add(r, name, value, kindtype, status):
         logger.error(msg)
         return responseto(msg, code=401)
 
-    robj = Regional(r=r, name=name, value=value, status=status, kindtype=kindtype, updatetime=datetime.now(timezone.utc))
+    robj = Regional(r=r, name=name, value=value, status=status, kindtype=kindtype, updatetime=datetime.now(timezone(timedelta(hours=offset))))
     resp = commit_and_response_error(robj, refresh=True)
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
     
 
-def regional_edit(r, name, value, kindtype, status):
+def regional_edit(r, name, value, kindtype, status, offset=0):
     """ 修改一个 regional
     """
     status = parse_int(status, 1)
@@ -125,7 +125,7 @@ def regional_edit(r, name, value, kindtype, status):
         robj.kindtype = kindtype
     if status is not None:
         robj.status = status
-    robj.updatetime = datetime.now(timezone.utc)
+    robj.updatetime = datetime.now(timezone(timedelta(hours=offset)))
     resp = commit_and_response_error(robj, refresh=True)
     if resp is not None:
         return resp

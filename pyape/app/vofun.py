@@ -6,14 +6,13 @@ pyape.app.vofun
 对 ValueObject 的操作封装
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import abort
 
 from pyape.util.func import parse_int
 from pyape import gconfig
 from pyape.app import gdb, gcache, logger
 from pyape.app.models.valueobject import ValueObject, get_vo_query
-from pyape.app.models.typeid import TypeID
 from pyape.app.re2fun import get_request_values, responseto, get_page_response
 from pyape.app.queryfun import commit_and_response_error
 
@@ -83,7 +82,7 @@ def valueobject_get(r, vid, name, merge, withcache):
     return responseto(vo=vo)
 
 
-def valueobject_add(r, withcache, name, value, votype, status=None, index=None, note=None, valuetype=None):
+def valueobject_add(r, withcache, name, value, votype, status=None, index=None, note=None, valuetype=None, offset=0):
     """ 增加一个 VO
     """
     if name is None or value is None or votype is None:
@@ -112,7 +111,7 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
         index=index if index is not None else 0,
         r=r,
         votype=votype,
-        updatetime=datetime.now(timezone.utc),
+        updatetime=datetime.now(timezone(timedelta(hours=offset))),
         note=note)
 
     resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
@@ -125,7 +124,7 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
     return responseto(vo=voitem, error=False, code=200)
 
 
-def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None, status=None, index=None, note=None, valuetype=None):
+def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None, status=None, index=None, note=None, valuetype=None, offset=0):
     """ 更新一个 VO
     """
     if vid is not None:
@@ -158,7 +157,7 @@ def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None,
     if voitem is None:
         return responseto(message='找不到 vo!', code=404, error=True)
 
-    voitem.updatetime = datetime.now(timezone.utc)
+    voitem.updatetime = datetime.now(timezone(timedelta(hours=offset)))
 
     # 只有明确提供了 status 才设置它
     # 不处理 votype/r ，因为已经创建了的 VO 不允许修改这些关键分类的值

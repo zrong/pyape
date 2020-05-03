@@ -5,7 +5,7 @@ pyape.app.models.regional
 
 Regional 表
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import toml
 from sqlalchemy.sql.expression import text
@@ -138,14 +138,14 @@ def check_regionals(rs, ignore_zero=False):
     return len(regionals) == lenrs
 
 
-def init_regional():
+def init_regional(offset=0):
     """ 初始化 regional0 这是必须存在的一条
     """
     r0 = Regional.query.get(0)
     if r0 is not None:
         raise TypeError('The regional 0 is exists!')
 
-    r0 = Regional(r=0, name='0', kindtype=0, status=1, updatetime=datetime.now(timezone.utc))
+    r0 = Regional(r=0, name='0', kindtype=0, status=1, updatetime=datetime.now(timezone(timedelta(hours=offset))))
     resp = commit_and_response_error(r0, return_dict=True)
     if resp is not None:
         raise SQLAlchemyError('Init regional table error: %s' % resp['message'])
