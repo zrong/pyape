@@ -26,7 +26,7 @@ class Regional(gdb.Model):
     REGIONAL_TYPES = [1000, 2000, 5000]
 
     # Regional 配置的主键序号
-    r = gdb.Column(gdb.SMALLINT, primary_key=True, index=True)
+    r = gdb.Column(gdb.SMALLINT, primary_key=True, index=True, autoincrement=False)
 
     # Regional 名称
     name = gdb.Column(gdb.VARCHAR(100), nullable=False)

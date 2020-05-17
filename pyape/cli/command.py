@@ -10,6 +10,8 @@ from pkg_resources import resource_filename
 
 import click
 
+from pyape.tpl import create_from_jinja
+
 
 basedir = Path(resource_filename('pyape', '__init__.py')).parent
 # 找到 tpl 文件夹所在地
@@ -18,6 +20,7 @@ fabconfig = Path('fabconfig')
 files = {
     'dotenv': '_env.jinja2',
     'uwsgi': 'uwsgi_ini.jinja2',
+    'gunicorn': 'gunicorn_conf_py.jinja2',
     'fabfile': 'fabfile.py',
     'fabconfig/init': '__init__.py',
     'fabconfig/local': 'env_local.py',
@@ -119,9 +122,89 @@ def top(address, frequency):
     pyape.uwsgitop.call(address, frequency)
 
 
+GEN_SUPE_HELP = '在当前文件夹下生成 supervisord.conf 配置文件'
+
+@click.command(help=GEN_SUPE_HELP)
+@click.option('-p', '--path', required=False, type=click.Path(), help='提供一个路径，配置中和路径相关的内容都放在这个路径下')
+@click.option('--unix-http-server-file', required=False, type=str)
+@click.option('--supervisord-logfile', required=False, type=str)
+@click.option('--supervisord-pidfile', required=False, type=str)
+@click.option('--supervisord-user', required=False, type=str)
+@click.option('--supervisord-directory', required=False, type=str)
+@click.option('--supervisorctl-serverurl', required=False, type=str)
+@click.option('--include-files', required=False, type=str)
+def gensupe(**kwargs):
+    try:
+        replaceobj = {}
+        path = kwargs.get('path')
+        if path is not None:
+            path = Path(path)
+            replaceobj['unix_http_server_file'] = str(path.joinpath('run', 'supervisord.sock').resolve())
+            replaceobj['supervisorctl_serverurl'] = 'unix://%s' % str(path.joinpath('run', 'supervisord.sock').resolve())
+            replaceobj['include_files'] = str(path.joinpath('conf.d').resolve()) + '/*.conf'
+            replaceobj['supervisord_logfile'] = str(path.joinpath('log', 'supervisord.log').resolve())
+            replaceobj['supervisord_pidfile'] = str(path.joinpath('run', 'supervisord.pid').resolve())
+            replaceobj['supervisord_directory'] = str(path.resolve())
+            
+        for k, v in kwargs.items():
+            if v is not None:
+                replaceobj[k] = v
+        name = 'supervisord'
+        cwdpath = Path().cwd()
+        create_from_jinja(name, cwdpath, replaceobj)
+    except Exception as e:
+        click.echo(click.style('生成错误：%s' % e, fg='red'), err=True)
+        raise click.Abort()
+
+
+GEN_SYS_HELP = '在当前文件夹下生成 systemd 需要的 supervisord.service 配置文件'
+
+@click.command(help=GEN_SYS_HELP)
+@click.option('--supervisord-exec', required=False, type=str)
+@click.option('--supervisorctl-exec', required=False, type=str)
+@click.option('--supervisord-conf', required=False, type=str)
+def gensys(**kwargs):
+    try:
+        replaceobj = {}
+        for k, v in kwargs.items():
+            if v is not None:
+                replaceobj[k] = v
+        name = 'systemd'
+        cwdpath = Path().cwd()
+        create_from_jinja(name, cwdpath, replaceobj)
+    except Exception as e:
+        click.echo(click.style('生成错误：%s' % e, fg='red'), err=True)
+        raise click.Abort()
+
+
+GEN_PROGRAM_CONF_HELP = '生成 supervisord 的 program 配置文件'
+
+@click.command(help=GEN_PROGRAM_CONF_HELP)
+@click.option('-n', '--name', required=True, type=str, help='Supervisor program 名称')
+@click.option('-c', '--config_file', required=True, type=click.Path(file_okay=True, readable=True))
+@click.option('-u', '--user', required=False, type=str, help='Supervisor program 的 user')
+def genprog(name, config_file, user):
+    try:
+        cwdpath = Path().cwd()
+        replaceobj = {
+            'cwd': cwdpath.resolve(),
+            'name': name,
+            'config_file': config_file,
+        }
+        if user is not None:
+            replaceobj['user'] = user
+        create_from_jinja('program', cwdpath.joinpath(name + '.conf'), replaceobj)
+    except Exception as e:
+        click.echo(click.style('生成错误 %s' % e, fg='red'), err=True)
+        raise click.Abort()
+
+
 main.add_command(copy)
 main.add_command(init)
 main.add_command(top)
+main.add_command(gensupe)
+main.add_command(gensys)
+main.add_command(genprog)
 
 
 if __name__ == '__main__':

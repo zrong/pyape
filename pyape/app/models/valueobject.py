@@ -8,6 +8,7 @@ ValueObject 表
 
 import json
 import toml
+from datetime import datetime
 
 from sqlalchemy.sql.expression import text, or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -140,6 +141,8 @@ class ValueObject(gdb.Model):
             for k in includes:
                 try:
                     v = getattr(self, k)
+                    if isinstance(v, datetime):
+                        v = v.isoformat()
                     voobj[k] = v
                 except AttributeError:
                     pass

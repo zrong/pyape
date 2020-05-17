@@ -364,3 +364,39 @@ class UwsgiDeploy(Deploy):
         if fifofile is None:
             raise Exit('进程还没有启动！')
         self.conn.run('echo r > %s' % fifofile)
+
+
+class SupervisorGunicornDeploy(Deploy):
+    """ 使用 Supervisor + Gunicorn 来部署服务
+    """
+    def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
+        super().__init__(name, envs, conn, basedir, deploy_root_dir, pye)
+
+    def get_pid_file(self):
+        """ 使用 pidfile 来判断进程是否启动
+        """
+        pidfile = self.get_remote_path('gunicorn.pid')
+        if self.remote_exists(pidfile):
+            return pidfile
+        return None
+
+    def start(self):
+        """ 启动服务进程
+        """
+        pidfile = self.get_pid_file()
+        if pidfile is not None:
+            raise Exit('进程不能重复启动！')
+        pass
+        # self.conn.run('uwsgi ' + self.get_remote_path('uwsgi.ini'))
+
+    def stop(self):
+        """ 停止 API 进程
+        """
+        # 删除 pidfile 以便下次启动
+        if pidfile is not None:
+            self.conn.run('rm %s' % pidfile)
+
+    def reload(self):
+        """ 优雅重载 API 进程
+        """
+        pass
