@@ -12,7 +12,7 @@ import os
 {%- if user is not defined %} {% set user = 'app' %} {% endif %}
 {%- if group is not defined %} {% set group = 'app' %} {% endif %}
 {%- if umask is not defined %} {% set umask = '0o22' %} {% endif %}
-{%- if daemon is not defined %} {% set daemon = False %} {% endif %}
+{%- if daemon is not defined %} {% set daemon = 'False' %} {% endif %}
 
 wsgi_app = '{{wsgi_app}}'
 

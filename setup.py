@@ -38,13 +38,6 @@ classifiers = [
 ]
 
 # 使用 flask 的扩展
-# entry_points = {
-#     'console_scripts': [
-#         'pyzog=pyape.cli:main',
-#     ]
-# }
-
-# 使用 flask 的扩展
 entry_points = {
     'flask.commands': [
         'pyape=pyape.cli.command:main',
@@ -52,7 +45,7 @@ entry_points = {
 }
 
 package_data = {
-    'pyape.tpl' : ['*.jinja2', 'fabconfig/*.py']
+    'pyape.tpl' : ['*.jinja2', '*.py', 'fabconfig/*.py']
 }
 
 
@@ -60,6 +53,8 @@ setup(
     name = "pyape",
     version=find_version('pyape', '__init__.py'),
     description = "The Python Application Programming Environment.",
+    long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     author = "zrong",
     author_email = "zrongzrong@gmail.com",
     url = "https://github.com/zrong/pyape",

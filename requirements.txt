@@ -1,3 +1,4 @@
+wheel
 Flask
 Flask-SQLAlchemy
 flask-compress

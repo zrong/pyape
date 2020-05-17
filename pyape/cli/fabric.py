@@ -211,8 +211,9 @@ class Deploy(object):
     def cat_remote_file(self, *args):
         """ 使用 cat 命令获取远程文件的内容
         """
-        f = self.get_remote_path(**args)
-        if self.remote_exists(f):
+        f = self.get_remote_path(*args)
+        logger.info('cat_remote_file %s', f)
+        if not self.remote_exists(f):
             return None
         result = self.conn.run('cat ' + f, warn=False, hide=True)
         return result.stdout
@@ -263,7 +264,38 @@ class Deploy(object):
         if not self.remote_exists(remote_venv_dir):
             self.conn.run('{} -m venv {}'.format(self.pye, remote_venv_dir))
         with self.conn.prefix('source {}/bin/activate'.format(remote_venv_dir)):
-            self.conn.run('pip install -r {}/requirements.txt'.format(remote_venv_dir))
+            self.conn.run('pip install -U pip')
+            self.conn.run('pip install -r {}'.format(self.get_remote_path('requirements.txt')))
+
+    def piplist(self, format='columns'):
+        """ 获取虚拟环境中的所有安装的 python 模块
+        :@param format: columns (default), freeze, or json
+        """
+        with self.conn.prefix(self.source_venv()):
+            result = self.conn.run('pip list --format ' + format)
+            return result.stdout
+
+    def pipoutdated(self, format='columns'):
+        """ 查看过期的 python 模块
+        :@param format: columns (default), freeze, or json
+        """
+        with self.conn.prefix(self.source_venv()):
+            result = self.conn.run('pip list --outdated --format ' + format)
+            return result.stdout
+
+    def pipupgrade(self, names=None, all=False):
+        """ 更新一个 python 模块
+        """
+        with self.conn.prefix(self.source_venv()):
+            mod_names = []
+            if all:
+                result = self.conn.run('pip list --outdated --format json')
+                if result.ok:
+                    mod_names = [item['name'] for item in json.loads(result.stdout)]
+            elif names:
+                mod_names = [name for name in names]
+            if mod_names:
+                self.conn.run('pip install -U ' + ' '.join(mod_names))
 
     def _get_replaceobj(self, baseobj, tplname, wrapkey=None):
         replobj = baseobj.copy()
@@ -401,12 +433,15 @@ class GunicornDeploy(Deploy):
     def get_pid_value(self, *args):
         """ 获取远程 pid 文件中的 pid 值
         """
-        pid_content = self.cat_remote_file('gunicorn.pid')
-        logger.info('get_pid_value %s', pid_content)
+        pid_value = self.cat_remote_file('gunicorn.pid')
+        if pid_value is None:
+            raise Exit('gunicorn.pid 没有值！')
+        return pid_value.strip()
 
-    def start(self, daemon=None):
+    def start(self, wsgi_app=None, daemon=None):
         """ 启动服务进程
-        如果 daemon 为 True，则强制加上 -D 参数
+        :@param wsgi_app: 传递 wsgi_app 名称
+        :@param daemon: 若值为 True，则强制加上 -D 参数
         """
         pidfile = self.get_pid_file()
         if pidfile is not None:
@@ -416,19 +451,31 @@ class GunicornDeploy(Deploy):
             cmd = 'gunicorn --config ' + conf
             if daemon == True:
                 cmd += ' -D'
+            if wsgi_app is not None:
+                cmd += ' ' + wsgi_app
             self.conn.run(cmd)
 
     def stop(self):
         """ 停止 API 进程
         """
-        # 删除 pidfile 以便下次启动
-        if pidfile is not None:
-            self.conn.run('rm %s' % pidfile)
+        pidvalue = self.get_pid_value()
+        killr = self.conn.run('kill -s TERM ' + pidvalue)
+        if killr.ok:
+            logger.warning('优雅关闭 %s', pidvalue)
+            # 删除 pidfile 以便下次启动
+            self.conn.run('rm %s' % self.get_pid_file())
+        else:
+            logger.warning('关闭 %s 失败', pidvalue)
 
     def reload(self):
         """ 优雅重载 API 进程
         """
-        pass
+        pidvalue = self.get_pid_value()
+        killr = self.conn.run('kill -s HUP ' + pidvalue)
+        if killr.ok:
+            logger.warning('优雅重载 %s', pidvalue)
+        else:
+            logger.warning('重载 %s 失败', pidvalue)
 
 
 class SupervisorGunicornDeploy(Deploy):

@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-部署 pyape 项目
+部署 pyape app
 ~~~~~~~~~~~~~~~~~~~
 
-默认使用 uWSGI 部署。
+默认使用 GunicornDeploy 部署。
+
+另外支持 UwsgiDeploy/SupervisorGunicornDeploy，详见 pyape.cli.fabric 。
 
 查看所有可用的环境(env)，请调用：
 
 fab envs
 
-对于一个全新的未部署的项目，请调用：
+对于一个全新的未部署的环境，请调用：
 
-fab new -env [env] 
+fab init -env [env] 
 
 然后需要登录服务器进入 flask shell 初始化数据库
 
@@ -19,14 +21,14 @@ fab start --env [env]
 
 日常更新功能：
 
-fab deploy --env [role] 
-fab reload --env [role] 
+fab deploy --env [env] 
+fab reload --env [env] 
 
-更新配置文件 config.json+uwsgi.ini+.env：
+更新配置文件 config.json + gunicorn.conf.py + .env：
 
-fab putjson --env [role] 
-fab putini --env [role] 
-fab putenv --env [role] 
+fab putjson --env [env] 
+fab putpy --env [env] 
+fab putenv --env [env] 
 """
 
 from pathlib import Path
@@ -34,9 +36,9 @@ from pathlib import Path
 from invoke import task
 from invoke.exceptions import Exit
 
-from pyape.cli.fabric import logger, UwsgiDeploy as Deploy
+from pyape.cli.fabric import logger, GunicornDeploy as Deploy
 
-from fabconfig import rsync_exclude, uwsgi_ini, config_json, _env, enviroments
+from fabconfig import rsync_exclude, config_json, _env, enviroments
 
 
 basedir = Path(__file__).parent
@@ -58,19 +60,18 @@ def putjson(c, env, local=False):
 
 
 @task
-def putini(c, env, local=False):
-    """ 生成 uwsgi.ini 并上传
-    """
-    d = Deploy(env, enviroments, c, basedir)
-    d.put_tpl('uwsgi_ini', uwsgi_ini, dstname='uwsgi.ini', force=True, local=local)
-
-
-@task
 def putenv(c, env, local=False):
     """ 生成 .env 或上传
     """
     d = Deploy(env, enviroments, c, basedir)
     d.put_tpl('_env', _env, dstname='.env', wrapkey='options', force=True, local=local)
+
+@task
+def putpy(c, env, local=False):
+    """ 生成 .py 并上传
+    """
+    d = Deploy(env, enviroments, c, basedir)
+    d.put_tpl('gunicorn_conf_py', _env, dstname='gunicorn.conf.py', force=True, local=local)
 
 
 @task
@@ -78,16 +79,22 @@ def putcfiles(c, env, local=False):
     """ 根据tpl文件生成配置文件并上传
     """
     d = Deploy(env, enviroments, c, basedir)
-    d.put_tpl('uwsgi_ini', uwsgi_ini, dstname='uwsgi.ini', force=True, local=local)
     d.put_tpl('config_json', config_json, dstname='config.json', force=True, local=local)
     d.put_tpl('_env', _env, dstname='.env', wrapkey='options', force=True, local=local)
+    d.put_tpl('gunicorn_conf_py', _env, dstname='gunicorn.conf.py', force=True, local=local)
+
 
 @task
-def venv(c, env):
+def venv(c, env, init=False, upgrade=None):
     """ 创建虚拟环境
     """
     d = Deploy(env, enviroments, c, basedir)
-    d.init_remote_venv()
+    if init:
+        d.init_remote_venv()
+    if upgrade == 'all':
+        d.pipupgrade(all=True)
+    elif isinstance(upgrade, str):
+        d.pipupgrade(names=upgrade.split(','))
 
 
 @task
@@ -96,26 +103,53 @@ def deploy(c, env):
     """
     d = Deploy(env, enviroments, c, basedir)
     d.rsync(exclude=rsync_exclude)
-    d.put_tpl('uwsgi_ini', uwsgi_ini, dstname='uwsgi.ini', force=True)
-    d.put_tpl('config_json', config_json, dstname='config.json', force=True)
-    d.put_tpl('_env', _env, dstname='.env', wrapkey='options', force=True)
+    putcfiles(c, env, False)
 
 
 @task
-def dar(c, env, venv=None):
+def dar(c, env):
     """ 部署并重载
     """
-    d = Deploy(env, enviroments, c, basedir)
-    if venv:
-        d.init_remote_venv()
-    d.deploy()
-    d.reload()
+    deploy(c, env)
+    reload(c, env)
 
 
 @task
-def new(c, env):
+def init(c, env):
     """ 在服务器上创建一个全新的 API 环境
     """
     d = Deploy(env, enviroments, c, basedir)
     d.deploy()
-    d.venv()
+    d.venv(init=True)
+
+
+@task
+def start(c, env, wsgi_app='wsgi:pyape_app'):
+    """ 在服务器上启动一个 API
+    """
+    d = Deploy(env, enviroments, c, basedir)
+    d.start(wsgi_app)
+
+
+@task
+def stop(c, env):
+    """ 在服务器上停止一个 API
+    """
+    d = Deploy(env, enviroments, c, basedir)
+    d.stop()
+
+
+@task
+def reload(c, env):
+    """ 在服务器上重载一个 API
+    """
+    d = Deploy(env, enviroments, c, basedir)
+    d.reload()
+
+
+@task
+def pipoutdated(c, env):
+    """ 打印所有的过期的 package
+    """
+    d = Deploy(env, enviroments, c, basedir)
+    d.pipoutdated()
