@@ -4,10 +4,9 @@ Fabric 的配置文件
 """
 
 # 要排除的文件/文件夹
-rsync_exclude = ['.DS_Store', '.idea', '.vscode', '*.pyc', 'fab*', '__pycache__', '*.swp', '*.iml', '*.code-workspace', '*.j2', '*.jinja2', '*.tpl', '*.sock',
-                 '.pyenv', 'venv', 'wiki', '.git', 'output', 'tests', 'logs',
-                 'wxqrcode', 'setup.py', '*.md', 'LICENSE', '*.in',
-                 '.gitignore', '.env', 'config.yaml', 'config.json', 'uwsgi.ini', 'uwsgi.pid', 'uwsgi.fifo']
+rsync_exclude = ['.DS_Store', '.vscode', '*.pyc', 'fab*', '__pycache__', '*.swp', '*.iml', '*.code-workspace', '*.jinja2', '*.dot', '*.json',
+    '.pyenv', 'venv', 'wiki', '.git', 'output', 'tests', 'logs', 'wechat_sdk', 'flask_sqlalchemy',
+    '.gitignore', 'config.*', 'uwsgi.*', '*.service', 'gunicorn.*']
 
 # .env 基本配置文件内容，保存 FLASK 运行需要的配置，以及 flask.config 中的配置
 # 可在 envs 中进行覆盖

@@ -5,38 +5,40 @@
 # author: zrong
 #====================================
 import multiprocessing
+import os
 
 {%- if wsgi_app is not defined %} {% set wsgi_app = 'wsgi:pyape_app' %} {% endif %}
 {%- if workers is not defined %} {% set workers = 'multiprocessing.cpu_count() * 2 + 1' %} {% endif %}
 {%- if user is not defined %} {% set user = 'app' %} {% endif %}
 {%- if group is not defined %} {% set group = 'app' %} {% endif %}
-{%- if umask is not defined %} {% set umask = '0022' %} {% endif %}
+{%- if umask is not defined %} {% set umask = '0o22' %} {% endif %}
+{%- if daemon is not defined %} {% set daemon = False %} {% endif %}
 
-wsgi_app = {{wsgi_app}}
-check_config = True
+wsgi_app = '{{wsgi_app}}'
 
 {%- if proc_name %}
-proc_name = {{proc_name}}
+proc_name = '{{proc_name}}'
 {%- endif %}
 
 {%- if chdir %}
-chdir = {{chdir}}
+chdir = '{{chdir}}'
 {%- endif %}
 
 {%- if pidfile %}
-pidfile = {{pidfile}}
+pidfile = '{{pidfile}}'
 {%- endif %}
-user = {{user}}
-group = {{group}}
+user = '{{user}}'
+group = '{{group}}'
 umask = {{umask}}
 {%- if bind %}
-bind = {{bind}}
+bind = '{{bind}}'
 {%- endif %}
 
 {%- if worker_class %}
-worker_class = {{worker_class}}
+worker_class = '{{worker_class}}'
 {%- endif %}
 workers = {{workers}}
 {%- if threads %}
 threads = {{threads}}
 {%- endif %}
+daemon = {{daemon}}

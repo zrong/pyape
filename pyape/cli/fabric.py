@@ -170,7 +170,8 @@ class Deploy(object):
         if deploy_dir is None:
             raise Exit('配置中必须包含 deploy_dir！')
         deploy_path = Path(deploy_dir)
-        if deploy_path.is_absolute:
+        # logger.info('get_remote_path deploy_path: %s, deploy_root_dir: %s', deploy_path, self.deploy_root_dir)
+        if deploy_path.is_absolute():
             return str(deploy_path.joinpath(*args).resolve())
         return str(self.deploy_root_dir.joinpath(deploy_path, *args))
 
@@ -204,8 +205,17 @@ class Deploy(object):
         remotedir = self.get_remote_path(*args)
         if not self.remote_exists(remotedir):
             command = 'mkdir %s' % remotedir
-            self.conn.run(command)
             logger.info('创建远程文件夹 %s', command)
+            self.conn.run(command)
+
+    def cat_remote_file(self, *args):
+        """ 使用 cat 命令获取远程文件的内容
+        """
+        f = self.get_remote_path(**args)
+        if self.remote_exists(f):
+            return None
+        result = self.conn.run('cat ' + f, warn=False, hide=True)
+        return result.stdout
 
     def get_remote_pid(self, host=None, port=None):
         """ 利用命令行查找某个端口运行进程的 pid
@@ -237,8 +247,14 @@ class Deploy(object):
         """
         for d in [ self.deploy_root_dir,
             self.deploy_root_dir.joinpath('logs'),
-            self.eploy_root_dir.joinpath('output') ]:
+            self.deploy_root_dir.joinpath('output') ]:
             self.make_remote_dir(d)
+
+    def source_venv(self):
+        remote_venv_dir = self.get_remote_path('venv')
+        if not self.remote_exists(remote_venv_dir):
+            raise Exit('venv 还没有创建！请先执行 init_remote_venv')
+        return 'source {}/bin/activate'.format(remote_venv_dir)
 
     def init_remote_venv(self):
         """ 创建虚拟环境
@@ -276,7 +292,7 @@ class Deploy(object):
             # 删除本地的临时配置文件
             localr = localrunner.run('rm -f ' + cb.tpltarget)
             if localr.ok:
-                logger.warning('删除本地临时文件 %s', db.tpltarget)
+                logger.warning('删除本地临时文件 %s', cb.tpltarget)
 
     def put_tpl(self, tplname, baseobj, dstname=None, wrapkey=None, force=False, local=False):
         """ 基于 jinja2 模板生成配置文件
@@ -307,9 +323,11 @@ class Deploy(object):
         self.init_remote_dir()
         if is_windows:
             # 因为 windows 下面的 rsync 不支持 windows 风格的绝对路径，转换成相对路径
-            pdir = str(self.basedir.relative_to('.').resoleve())
+            pdir = str(self.basedir.relative_to('.').resolve())
         else:
-            pdir = str(self.basedir.resoleve())
+            pdir = str(self.basedir.resolve())
+        if not pdir.endswith('/'):
+            pdir += '/'
         deploy_dir = self.get_remote_path()
         transfers.rsync(self.conn, pdir, deploy_dir, exclude=exclude)
         logger.warn('RSYNC [%s] to [%s]', pdir, deploy_dir)
@@ -366,8 +384,55 @@ class UwsgiDeploy(Deploy):
         self.conn.run('echo r > %s' % fifofile)
 
 
+class GunicornDeploy(Deploy):
+    """ 使用 Gunicorn 来部署服务
+    """
+    def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
+        super().__init__(name, envs, conn, basedir, deploy_root_dir, pye)
+
+    def get_pid_file(self):
+        """ 使用 pidfile 来判断进程是否启动
+        """
+        pidfile = self.get_remote_path('gunicorn.pid')
+        if self.remote_exists(pidfile):
+            return pidfile
+        return None
+
+    def get_pid_value(self, *args):
+        """ 获取远程 pid 文件中的 pid 值
+        """
+        pid_content = self.cat_remote_file('gunicorn.pid')
+        logger.info('get_pid_value %s', pid_content)
+
+    def start(self, daemon=None):
+        """ 启动服务进程
+        如果 daemon 为 True，则强制加上 -D 参数
+        """
+        pidfile = self.get_pid_file()
+        if pidfile is not None:
+            raise Exit('进程不能重复启动！')
+        with self.conn.prefix(self.source_venv()):
+            conf = self.get_remote_path('gunicorn.conf.py')
+            cmd = 'gunicorn --config ' + conf
+            if daemon == True:
+                cmd += ' -D'
+            self.conn.run(cmd)
+
+    def stop(self):
+        """ 停止 API 进程
+        """
+        # 删除 pidfile 以便下次启动
+        if pidfile is not None:
+            self.conn.run('rm %s' % pidfile)
+
+    def reload(self):
+        """ 优雅重载 API 进程
+        """
+        pass
+
+
 class SupervisorGunicornDeploy(Deploy):
-    """ 使用 Supervisor + Gunicorn 来部署服务
+    """ 使用 Supervisor + Gunicorn(非 daemon 模式) 来部署服务
     """
     def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
         super().__init__(name, envs, conn, basedir, deploy_root_dir, pye)
