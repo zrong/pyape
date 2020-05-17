@@ -243,12 +243,14 @@ class Deploy(object):
             return None
         return re.split(r'\s+', result.stdout)[1]
 
-    def init_remote_dir(self):
+    def init_remote_dir(self, deploy_dir):
         """ 创建远程服务器的运行环境
         """
+        deploy_dir_path = Path(deploy_dir)
         for d in [ self.deploy_root_dir,
-            self.deploy_root_dir.joinpath('logs'),
-            self.deploy_root_dir.joinpath('output') ]:
+            deploy_dir,
+            deploy_dir_path.joinpath('logs'),
+            deploy_dir_path.joinpath('output') ]:
             self.make_remote_dir(d)
 
     def source_venv(self):
@@ -352,7 +354,6 @@ class Deploy(object):
     def rsync(self, exclude=[], is_windows=False):
         """ 部署最新程序到远程服务器
         """
-        self.init_remote_dir()
         if is_windows:
             # 因为 windows 下面的 rsync 不支持 windows 风格的绝对路径，转换成相对路径
             pdir = str(self.basedir.relative_to('.').resolve())
@@ -361,6 +362,7 @@ class Deploy(object):
         if not pdir.endswith('/'):
             pdir += '/'
         deploy_dir = self.get_remote_path()
+        self.init_remote_dir(deploy_dir)
         transfers.rsync(self.conn, pdir, deploy_dir, exclude=exclude)
         logger.warn('RSYNC [%s] to [%s]', pdir, deploy_dir)
 

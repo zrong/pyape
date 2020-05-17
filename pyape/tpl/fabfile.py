@@ -118,9 +118,8 @@ def dar(c, env):
 def init(c, env):
     """ 在服务器上创建一个全新的 API 环境
     """
-    d = Deploy(env, enviroments, c, basedir)
-    d.deploy()
-    d.venv(init=True)
+    deploy(c, env)
+    venv(c, env, init=True)
 
 
 @task

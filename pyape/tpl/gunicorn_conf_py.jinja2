@@ -11,7 +11,6 @@ import os
 {%- if workers is not defined %} {% set workers = 'multiprocessing.cpu_count() * 2 + 1' %} {% endif %}
 {%- if user is not defined %} {% set user = 'app' %} {% endif %}
 {%- if group is not defined %} {% set group = 'app' %} {% endif %}
-{%- if umask is not defined %} {% set umask = '0o22' %} {% endif %}
 {%- if daemon is not defined %} {% set daemon = 'False' %} {% endif %}
 
 wsgi_app = '{{wsgi_app}}'
@@ -29,7 +28,9 @@ pidfile = '{{pidfile}}'
 {%- endif %}
 user = '{{user}}'
 group = '{{group}}'
+{%- if umask is defined %}
 umask = {{umask}}
+{%- endif %}
 {%- if bind %}
 bind = '{{bind}}'
 {%- endif %}
@@ -42,3 +43,13 @@ workers = {{workers}}
 threads = {{threads}}
 {%- endif %}
 daemon = {{daemon}}
+
+{%- if capture_output %}
+capture_output = {{capture_output}}
+{%- endif %}
+{%- if errorlog %}
+errorlog = '{{errorlog}}'
+{%- endif %}
+{%- if accesslog %}
+accesslog = '{{accesslog}}'
+{%- endif %}
