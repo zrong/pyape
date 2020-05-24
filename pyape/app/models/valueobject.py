@@ -51,18 +51,19 @@ class ValueObject(gdb.Model):
 
     @staticmethod
     def dump_value(value, type_='json'):
-        """
-        将提供的 value 转换成为 TOML 或者 JSON 字符串
+        """ 将提供的 value 转换成为 TOML 或者 JSON 字符串
         :return:
         """
         if type_ == 'toml':
+            # toml 不支持 list 格式，对于之前 json list 格式的配置文件，加入一个顶级的 ROOTLIST 键
+            if isinstance(value, list):
+                return toml.dumps({'ROOTLIST': value})
             return toml.dumps(value)
         return json.dumps(value, ensure_ascii=False)
 
     @staticmethod
     def load_value(value, type_=None):
-        """
-        将 value 字符串转换成为 dict 或者 list
+        """ 将 value 字符串转换成为 dict 或者 list
         首先检测是否为 json 格式
         然后考虑 toml 格式
         :return:

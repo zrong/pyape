@@ -40,7 +40,6 @@ def valueobject_get_all(r, votype, status, merge):
     return responseto(vos=vos)
 
 
-
 def _get_vo_by_cache(r, name):
     """ 从缓存中查询 vo 的 value
     若缓存中不存在，则从数据库中查询并将其写入缓存
@@ -52,6 +51,26 @@ def _get_vo_by_cache(r, name):
             valueobj = vo.get_value()
             gcache.setg(name, valueobj, r)
     return valueobj
+
+
+def valueobject_check_value(value, valuetype):
+    """ 检查要写入 valueobject 的字符串或者对象
+    字符串要检查是否合法，对象要将其转换成字符串并返回
+    :@param value: list/dict/str
+    :@param valuetype: json/toml
+    """
+    value_string = None
+    if isinstance(value, str):
+        # 检测字符串是否正常解析
+        vobj = ValueObject.load_value(value, valuetype)
+        if vobj is None:
+            raise ValueError('value must be a {} string!'.format(valuetype))
+        value_string = value
+    elif isinstance(value, dict) or isinstance(value, list):
+        value_string = ValueObject.dump_value(value, valuetype)
+    if value_string is None:
+        raise ValueError('value check error!')
+    return value_string
 
 
 # @checker.request_checker('vid', 'name', 'merge', defaultvalue={'merge': 1, 'withcache': 0}, request_key='args', parse_int_params=['merge', 'withcache'])
@@ -93,13 +112,11 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
             return responseto(message='status 必须是整数!', code=401, error=True)
     if index is not None:
         index = parse_int(index)
-    if isinstance(value, str):
-        # 检测字符串是否正常解析
-        vobj = ValueObject.load_value(value, valuetype)
-        if vobj is None:
-            return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
-    else:
-        value = ValueObject.dump_value(value, valuetype)
+    try:
+        value = valueobject_check_value(value, valuetype)
+    except e as ValueError:
+        logger.error('valueobject_add %s', str(e))
+        return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
 
     votype = parse_int(votype)
     if votype is None:
@@ -140,11 +157,11 @@ def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None,
     if index is not None:
         index = parse_int(index)
 
-    if isinstance(value, str):
-        # 检测字符串是否正常解析
-        vobj = ValueObject.load_value(value, valuetype)
-        if vobj is None:
-            return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
+    try:
+        value = valueobject_check_value(value, valuetype)
+    except e as ValueError:
+        logger.error('valueobject_add %s', str(e))
+        return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
 
     voitem = None
     if vid is not None:
