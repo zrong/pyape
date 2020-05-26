@@ -115,7 +115,7 @@ def responseto(message=None, error=None, code=None, data=None, replaceobj=None, 
             data['code'] = 444
         else:
             data['code'] = 200
-    resp = jsonify(data)
+    resp = jsonify(data, ensure_ascii=False)
     return resp
 
 
