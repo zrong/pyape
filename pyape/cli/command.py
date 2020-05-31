@@ -21,13 +21,13 @@ files = {
     'dotenv': '_env.jinja2',
     'uwsgi': 'uwsgi_ini.jinja2',
     'gunicorn': 'gunicorn_conf_py.jinja2',
+    'gunicorn_nginx': 'gunicorn_nginx.conf.jinja2',
     'fabfile': 'fabfile.py',
     'fabconfig/init': '__init__.py',
     'fabconfig/local': 'env_local.py',
     'fabconfig/prod': 'env_prod.py',
     'fabconfig/test': 'env_test.py',
     'wsgi': 'wsgi.py',
-    'run': 'run.sh',
     'readme': 'README.md',
 }
 

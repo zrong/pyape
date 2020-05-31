@@ -390,13 +390,21 @@ class UwsgiDeploy(Deploy):
             return pidfile
         return None
 
+    def get_uwsgi_exe(self):
+        """ 获取 venv 中 uwsgi 的可执行文件绝对路径
+        """
+        uwsgi_exe = self.get_remote_path('venv/bin/uwsgi')
+        if not self.remote_exists(uwsgi_exe):
+            raise Exit('没有找到 uwsgi 可执行文件！请先执行 init_remote_venv')
+        return uwsgi_exe
+
     def start(self):
         """ 启动服务进程
         """
         pidfile = self.get_pid_file()
         if pidfile is not None:
             raise Exit('进程不能重复启动！')
-        self.conn.run('uwsgi ' + self.get_remote_path('uwsgi.ini'))
+        self.conn.run(self.get_uwsgi_exe() + ' ' + self.get_remote_path('uwsgi.ini'))
 
     def stop(self):
         """ 停止 API 进程
@@ -440,6 +448,14 @@ class GunicornDeploy(Deploy):
             raise Exit('gunicorn.pid 没有值！')
         return pid_value.strip()
 
+    def get_gunicorn_exe(self):
+        """ 获取 venv 中 uwsgi 的可执行文件绝对路径
+        """
+        gunicorn_exe = self.get_remote_path('venv/bin/gunicorn')
+        if not self.remote_exists(gunicorn_exe):
+            raise Exit('没有找到 gunicorn 可执行文件！请先执行 init_remote_venv')
+        return gunicorn_exe
+
     def start(self, wsgi_app=None, daemon=None):
         """ 启动服务进程
         :@param wsgi_app: 传递 wsgi_app 名称
@@ -448,14 +464,13 @@ class GunicornDeploy(Deploy):
         pidfile = self.get_pid_file()
         if pidfile is not None:
             raise Exit('进程不能重复启动！')
-        with self.conn.prefix(self.source_venv()):
-            conf = self.get_remote_path('gunicorn.conf.py')
-            cmd = 'gunicorn --config ' + conf
-            if daemon == True:
-                cmd += ' -D'
-            if wsgi_app is not None:
-                cmd += ' ' + wsgi_app
-            self.conn.run(cmd)
+        conf = self.get_remote_path('gunicorn.conf.py')
+        cmd = self.get_gunicorn_exe() + ' --config ' + conf
+        if daemon == True:
+            cmd += ' -D'
+        if wsgi_app is not None:
+            cmd += ' ' + wsgi_app
+        self.conn.run(cmd)
 
     def stop(self):
         """ 停止 API 进程

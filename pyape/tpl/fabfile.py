@@ -38,7 +38,7 @@ from invoke.exceptions import Exit
 
 from pyape.cli.fabric import logger, GunicornDeploy as Deploy
 
-from fabconfig import rsync_exclude, config_json, _env, enviroments
+from fabconfig import rsync_exclude, config_json, _env, gunicorn_conf_py, enviroments
 
 
 basedir = Path(__file__).parent

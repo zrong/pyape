@@ -266,7 +266,21 @@ def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=F
     :param config_name:
     :return:
     """
-    pyape_app = FlaskClass(__name__, static_url_path=gconfig.getcfg('PATH', 'STATIC_URL_PATH'))
+    kwargs = {'static_url_path': gconfig.getcfg('PATH', 'STATIC_URL_PATH')}
+
+    instance_path = gconfig.getcfg('PATH', 'INSTANCE_PATH')
+    if instance_path:
+        kwargs['instance_path'] = str(gconfig.getdir(instance_path).resolve())
+    else:
+        kwargs['instance_path'] = str(gconfig.getdir().resolve())
+
+    template_folder = gconfig.getcfg('PATH', 'TEMPLATE_FOLDER')
+    if template_folder:
+        kwargs['template_folder'] = str(gconfig.getdir(template_folder).resolve())
+    else:
+        kwargs['template_folder'] = str(gconfig.getdir('templates').resolve())
+
+    pyape_app = FlaskClass(__name__, **kwargs)
     pyape_app.response_class = ResponseClass
     pyape_app.config.from_object(ConfigClass(gconfig.getcfg('FLASK')))
     if pyape_app.config.get('COMPRESS_ON'):
