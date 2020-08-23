@@ -114,7 +114,7 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
         index = parse_int(index)
     try:
         value = valueobject_check_value(value, valuetype)
-    except e as ValueError:
+    except ValueError as e:
         logger.error('valueobject_add %s', str(e))
         return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
 
@@ -159,7 +159,7 @@ def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None,
 
     try:
         value = valueobject_check_value(value, valuetype)
-    except e as ValueError:
+    except ValueError as e:
         logger.error('valueobject_add %s', str(e))
         return responseto(message='value 无法正常解析！请检查。', code=401, error=True)
 
