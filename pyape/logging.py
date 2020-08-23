@@ -11,15 +11,15 @@ from pythonjsonlogger import jsonlogger
 TEXT_LOG_FORMAT = """
 [%(asctime)s] %(levelname)s in %(module)s.%(funcName)s [%(pathname)s:%(lineno)d]:
 %(message)s"""
-JSON_LOG_FORMAT = r'%(levelname)s %(module)s %(funcName)s %(pathname)s %(lineno) %(threadName) %(processName) %(created) %(message)s'
+JSON_LOG_FORMAT = r'%(levelname)s %(module)s %(funcName)s %(pathname)s %(lineno) %(threadName) %(processName) %(created) %(asctime) %(message)s'
 
 
 class ZeroMQHandler(logging.Handler):
-    """基于 ZeroMQ 的模式来发布 log
+    """基于 ZeroMQ 的 ROUTER-DEALER 模式来发布 log
 
     范例::
 
-        sock = context.socket(zmq.PUB)
+        sock = context.socket(zmq.DEALER)
         sock.connect('tcp://192.168.0.1:5050')
         handler = ZeroMQHandler(sock)
 
@@ -33,7 +33,7 @@ class ZeroMQHandler(logging.Handler):
     ctx = None
     socket_type = None
     
-    def __init__(self, interface_or_socket, context=None, socket_type=zmq.PUB):
+    def __init__(self, interface_or_socket, context=None, socket_type=zmq.DEALER):
         """ 创建 ZeroMQ context 和 socket
         :param interface_or_socket: 提供一个 socket 或者协议字符串
         :param context: 提供 ZeroMQ 的上下文
@@ -153,7 +153,7 @@ def get_logging_handler(type_, fmt, level=logging.INFO, target=None, name=None) 
     elif fmt == 'text':
         formatter = logging.Formatter(TEXT_LOG_FORMAT)
     else:
-        formatter = jsonlogger.JsonFormatter(JSON_LOG_FORMAT, timestamp=False)
+        formatter = jsonlogger.JsonFormatter(JSON_LOG_FORMAT, timestamp=False, json_ensure_ascii=False)
     handler.setLevel(level)
     handler.setFormatter(formatter)
     return handler
