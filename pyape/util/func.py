@@ -9,7 +9,7 @@ pyape.util.func
 """
 
 import os
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time as time2
 import time
 import re
 import json
@@ -98,6 +98,36 @@ def strfdate(dtobj):
     :return:
     """
     return dtobj.strftime('%Y-%m-%d')
+
+
+def strptime(timestr):
+    """ 将一个 time 字符串按照 HH:MM:SS 形式的字符串转换成 datetime.time 对象
+    :param timestr: 时间字符串
+    :return: datetime.time
+    """
+    dt = datetime.strptime(timestr, '%H:%M:%S')
+    return time2(dt.hour, dt.minute, dt.second)
+
+
+def in_time_range(timestart, timeend, dt=None):
+    """ 判断给定的时间 dt 是否在两个时间中间。
+    :param timestart: 开始的时间，支持字符串和 time 对象，字符串使用本模块中的 strptime 解析
+    :param timeend: 结束的时间，支持字符串和 time 对象，字符串使用本模块中的 strptime 解析
+    :param dt: 给定的 datetime 对象，如果不提供则使用 datetime.now()
+    :return: boolean
+    """
+    if isinstance(timestart, str):
+        timestart = strptime(timestart)
+    if isinstance(timeend, str):
+        timeend = strptime(timeend)
+    if dt is None:
+        dt = datetime.now()
+    dtstart = datetime(dt.year, dt.month, dt.day, timestart.hour, timestart.minute, timestart.second)
+    dtend = datetime(dt.year, dt.month, dt.day, timeend.hour, timeend.minute, timeend.second)
+    # 如果 timeend 小于 timestart，就将 timeend 增加一天。
+    if timeend < timestart:
+        dtend += timedelta(days=1)
+    return dt > dtstart and dt < dtend
 
 
 def next_month_dt(day=None):
