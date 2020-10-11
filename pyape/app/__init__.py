@@ -260,13 +260,14 @@ def register_blueprint(pyape_app, rest_package, rest_package_names):
         pyape_app.register_blueprint(getattr(bp_module, bp_name), url_prefix=url)
 
 
-def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=FlaskConfig):
+def _build_kwargs_for_app():
+    """ 将本地所有路径转换为绝对路径，以保证其在任何环境下可用
     """
-    根据不同的配置创建 app
-    :param config_name:
-    :return:
-    """
-    kwargs = {'static_url_path': gconfig.getcfg('PATH', 'STATIC_URL_PATH')}
+    kwargs = {
+            'static_url_path': gconfig.getcfg('PATH', 'STATIC_URL_PATH'),
+            'static_folder': gconfig.getcfg('PATH', 'STATIC_FOLDER', 'static'),
+            'template_folder': gconfig.getcfg('PATH', 'TEMPLATE_FOLDER', default_value='templates')
+        }
 
     instance_path = gconfig.getcfg('PATH', 'INSTANCE_PATH')
     if instance_path:
@@ -274,11 +275,20 @@ def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=F
     else:
         kwargs['instance_path'] = str(gconfig.getdir().resolve())
 
-    template_folder = gconfig.getcfg('PATH', 'TEMPLATE_FOLDER')
-    if template_folder:
-        kwargs['template_folder'] = str(gconfig.getdir(template_folder).resolve())
-    else:
-        kwargs['template_folder'] = str(gconfig.getdir('templates').resolve())
+    kwargs['template_folder'] = str(gconfig.getdir(kwargs['template_folder']).resolve())
+    kwargs['static_folder'] = str(gconfig.getdir(kwargs['static_folder']).resolve())
+    return kwargs
+
+
+def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=FlaskConfig):
+    """
+    根据不同的配置创建 app
+    :param config_name:
+    :return:
+    """
+    kwargs = _build_kwargs_for_app()
+
+    print('kwags', kwargs)
 
     pyape_app = FlaskClass(__name__, **kwargs)
     pyape_app.response_class = ResponseClass

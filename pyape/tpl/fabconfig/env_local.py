@@ -16,7 +16,8 @@ env_local = {
             'SQLALCHEMY_DATABASE_URI': 'mysql+pymysql://zrong:123456@127.0.0.1/pyape_local',
         },
         'PATH': {
-            'STATIC_URL_PATH': '',
+            'STATIC_FOLDER': 'dist',
+            'STATIC_URL_PATH': '/static',
             'modules': {
                 'cf': '/cf',
             }

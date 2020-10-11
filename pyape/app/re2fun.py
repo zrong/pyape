@@ -71,15 +71,16 @@ def get_request_values(*args, replaceobj=None, defaultvalue={}, request_key='jso
     return dict(defaultvalue, **dict(rinfo, **rdata))
 
 
-def responseto(message=None, error=None, code=None, data=None, replaceobj=None, replaceobj_key_only=False, **kwargs):
+def responseto(message=None, error=None, code=None, data=None, replaceobj=None, replaceobj_key_only=False, return_dict=False, **kwargs):
     """ 封装 json 响应
     :param message: 错误消息，若提供则默认 error 为 True
     :param error: 是否包含错误
     :param code: 错误代码，若不提供则值可能为 200 error=False/444 error=True
     :param data: 若提供了 data，则 data 中应该包含 error/message/code
     :param replaceobj: 替换响应中的键名。 {'被替换': '替换值'}
+    :param return_dict: 若值为 True，则返回 dict
     :param kwargs: 要加入响应的其他对象，可以是 model 也可以是 dict
-    :return: 一个 Response 对象
+    :return: 一个 Response 对象，或者一个 dict
     """
 
     # 如果提供了 data，那么不理任何其他参数，直接响应 data
@@ -115,8 +116,9 @@ def responseto(message=None, error=None, code=None, data=None, replaceobj=None, 
             data['code'] = 444
         else:
             data['code'] = 200
-    resp = jsonify(data)
-    return resp
+    if return_dict:
+        return data
+    return jsonify(data)
 
 
 def get_from_to_date(from_date=None, to_date=None, default=True, strftime=False):
