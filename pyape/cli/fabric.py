@@ -3,6 +3,7 @@ import re
 import logging
 import sys
 import json
+from datetime import datetime
 
 from pathlib import Path
 from patchwork import files, transfers
@@ -365,6 +366,19 @@ class Deploy(object):
         self.init_remote_dir(deploy_dir)
         transfers.rsync(self.conn, pdir, deploy_dir, exclude=exclude)
         logger.warn('RSYNC [%s] to [%s]', pdir, deploy_dir)
+
+    def get_logs(self, extras=[]):
+        """ 下载远程 logs 到本地
+        """
+        log_files = ['app.log', 'error.log', 'access.log']
+        time_string = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        for f in log_files + extras:
+            logf = self.get_remote_path('logs/{}'.format(f))
+            if not self.remote_exists(logf):
+                logger.warning('找不到远程 log 文件 %s', logf)
+                continue
+            local_file = self.basedir.joinpath('logs', '{name}_{filename}_{times}'.format(name=self.name, times=time_string, filename=f))
+            self.conn.get(logf, local=local_file)
 
 
 class UwsgiDeploy(Deploy):
