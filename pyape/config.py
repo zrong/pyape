@@ -203,7 +203,7 @@ class GlobalConfig(object):
             data = self.cfg_json
         if args:
             if isinstance(data, dict):
-                return self.getcfg(*args[1:], data=data.get(args[0], default_value))
+                return self.getcfg(*args[1:], data=data.get(args[0], default_value), default_value=default_value)
             return data
         return data
 

@@ -264,8 +264,8 @@ def _build_kwargs_for_app():
     """ 将本地所有路径转换为绝对路径，以保证其在任何环境下可用
     """
     kwargs = {
-            'static_url_path': gconfig.getcfg('PATH', 'STATIC_URL_PATH'),
-            'static_folder': gconfig.getcfg('PATH', 'STATIC_FOLDER', 'static'),
+            'static_url_path': gconfig.getcfg('PATH', 'STATIC_URL_PATH', default_value=''),
+            'static_folder': gconfig.getcfg('PATH', 'STATIC_FOLDER', default_value='static'),
             'template_folder': gconfig.getcfg('PATH', 'TEMPLATE_FOLDER', default_value='templates')
         }
 
@@ -287,8 +287,6 @@ def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=F
     :return:
     """
     kwargs = _build_kwargs_for_app()
-
-    print('kwags', kwargs)
 
     pyape_app = FlaskClass(__name__, **kwargs)
     pyape_app.response_class = ResponseClass
