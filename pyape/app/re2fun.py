@@ -177,18 +177,23 @@ def get_page_response(query, page, per_page, itemskey, return_method=None,
     :param kwargs: 见 re2fun.responseto
     :return: 一个多页响应对象
     """
+    data = None
     if isinstance(query, BaseQuery):
-        pages = query.paginate(int(page), int(per_page), False)
-        data = dict(page=pages.page, prev_num=pages.prev_num, next_num=pages.next_num,
-                    has_next=pages.has_next, has_prev=pages.has_prev, pages=pages.pages,
-                    total=pages.total, per_page=pages.per_page, error=False, code=200)
-        if callable(return_method):
-            data[itemskey] = return_method(pages.items)
-            return data
-        elif return_method == 'model':
-            data[itemskey] = gdb.to_response_data(pages.items, replaceobj, replaceobj_key_only)
-            return data
-        data[itemskey] = pages.items
+        try:
+            pages = query.paginate(int(page), int(per_page), False)
+            data = dict(page=pages.page, prev_num=pages.prev_num, next_num=pages.next_num,
+                        has_next=pages.has_next, has_prev=pages.has_prev, pages=pages.pages,
+                        total=pages.total, per_page=pages.per_page, error=False, code=200)
+            if callable(return_method):
+                data[itemskey] = return_method(pages.items)
+                return data
+            elif return_method == 'model':
+                data[itemskey] = gdb.to_response_data(pages.items, replaceobj, replaceobj_key_only)
+                return data
+            data[itemskey] = pages.items
+        except Exception as e:
+            logger.critical('re2fun.get_page_response error: %s', str(e))
+            return responseto(message=str(e), error=True, code=500)
     else:
         data = dict(page=page, prev_num=1, next_num=1,
             has_next=False, has_prev=False, 
