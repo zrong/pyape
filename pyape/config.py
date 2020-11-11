@@ -164,7 +164,7 @@ class GlobalConfig(object):
         """
         jsonf = self.getdir(filename, basedir=basedir)
         if jsonf.exists():
-            return json.loads(jsonf.read_text(encoding='utf-8'), encoding='utf-8')
+            return json.loads(jsonf.read_text(encoding='utf-8'))
         if throw_error:
             raise FileNotFoundError('%s is not found!' % jsonf.resolve())
         return {}

@@ -377,7 +377,8 @@ class Deploy(object):
             if not self.remote_exists(logf):
                 logger.warning('找不到远程 log 文件 %s', logf)
                 continue
-            local_file = self.basedir.joinpath('logs', '{name}_{filename}_{times}'.format(name=self.name, times=time_string, filename=f))
+            logp = Path(logf)
+            local_file = self.basedir.joinpath('logs', '{name}_{basename}_{times}{extname}'.format(name=self.name, times=time_string, basename=logp.name, extname=logp.suffix))
             self.conn.get(logf, local=local_file)
 
 

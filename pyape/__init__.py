@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__version__ = '0.1.20'
+__version__ = '0.1.21'
 
 from functools import wraps
 
