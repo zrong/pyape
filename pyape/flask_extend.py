@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from werkzeug.datastructures import Headers
 from flask import (Flask, Response, request)
 

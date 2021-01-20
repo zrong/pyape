@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Fabric 的配置文件
 """
@@ -15,6 +14,16 @@ _env = {
     'FLASK_ENV': 'production',
     # 'FLASK_RUN_PORT': 5000,
     # 'FLASK_RUN_WITH_THREADS': True,
+}
+
+# gunicorn.conf.py 的基本配置文件内容，可在 env 中进行覆盖
+gunicorn_conf_py = {
+    'wsgi_app': 'wsgi:pyape_app',
+    'proc_name': 'sagi-oidc',
+    'bind': '127.0.0.1:5001',
+    'umask': 0,
+    'daemon': 'True',
+    'capture_output': 'True',
 }
 
 # uwsgi.ini 基本配置文件内容

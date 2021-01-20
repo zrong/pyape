@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 env_prod = {
     'deploy_dir': 'pyape_prod',
     '_env': {

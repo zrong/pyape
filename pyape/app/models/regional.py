@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 pyape.app.models.regional
 ~~~~~~~~~~~~~~~~~~~
 
 Regional 表
 """
-from datetime import datetime, timezone, timedelta
-
+import time
 import toml
 from sqlalchemy.sql.expression import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -40,10 +38,13 @@ class Regional(gdb.Model):
     # Regional 的状态，值为在 TypeID 中的整数，1正常，5 禁用
     status = gdb.Column(gdb.SMALLINT, nullable=False, default=1)
 
-    createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('CURRENT_TIMESTAMP'))
+    # createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('CURRENT_TIMESTAMP'))
     # updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True,
     #                        server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
-    updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True)
+
+    # 改用时间戳，将格式化完全交给客户端来处理
+    createtime = gdb.Column(gdb.INT, nullable=False)
+    updatetime = gdb.Column(gdb.INT, nullable=True)
 
     @staticmethod
     def r2type(r):
@@ -90,8 +91,8 @@ class Regional(gdb.Model):
         parsed_dict['r'] = self.r
         parsed_dict['kindtype'] = self.kindtype
         parsed_dict['status'] = self.status
-        parsed_dict['createtime'] = self.createtime.isoformat()
-        parsed_dict['updatetime'] = self.updatetime.isoformat()
+        parsed_dict['createtime'] = self.createtime
+        parsed_dict['updatetime'] = self.updatetime
         parsed_dict['rtype'] = Regional.r2type(self.r)
         return parsed_dict
 
@@ -138,14 +139,15 @@ def check_regionals(rs, ignore_zero=False):
     return len(regionals) == lenrs
 
 
-def init_regional(offset=0):
+def init_regional():
     """ 初始化 regional0 这是必须存在的一条
     """
     r0 = Regional.query.get(0)
     if r0 is not None:
         raise TypeError('The regional 0 is exists!')
 
-    r0 = Regional(r=0, name='0', kindtype=0, status=1, updatetime=datetime.now(timezone(timedelta(hours=offset))))
+    now = int(time.time())
+    r0 = Regional(r=0, name='0', kindtype=0, status=1, createtime=now, updatetime=now)
     resp = commit_and_response_error(r0, return_dict=True)
     if resp is not None:
         raise SQLAlchemyError('Init regional table error: %s' % resp['message'])

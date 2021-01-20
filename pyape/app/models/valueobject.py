@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 pyape.app.models.valueobject
 ~~~~~~~~~~~~~~~~~~~
@@ -8,9 +7,8 @@ ValueObject 表
 
 import json
 import toml
-from datetime import datetime
 
-from sqlalchemy.sql.expression import text, or_
+from sqlalchemy.sql.expression import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from pyape.app import gdb, logger
@@ -41,10 +39,14 @@ class ValueObject(gdb.Model):
     # VO 是 1启用 还是 5禁用
     status = gdb.Column(gdb.SMALLINT, index=True, nullable=False, default=1)
 
-    createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('CURRENT_TIMESTAMP'))
+    # createtime = gdb.Column(gdb.TIMESTAMP(True), server_default=text('CURRENT_TIMESTAMP'))
     # updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True,
     #                        server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
-    updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True)
+    # updatetime = gdb.Column(gdb.TIMESTAMP(True), nullable=True)
+
+    # 2021-01-10 改用时间戳，将格式化完全交给客户端来处理
+    createtime = gdb.Column(gdb.INT, nullable=False)
+    updatetime = gdb.Column(gdb.INT, nullable=True)
 
     # 说明字段
     note = gdb.Column(gdb.VARCHAR(512), nullable=True)
@@ -142,8 +144,9 @@ class ValueObject(gdb.Model):
             for k in includes:
                 try:
                     v = getattr(self, k)
-                    if isinstance(v, datetime):
-                        v = v.isoformat()
+                    # 2021-01-10 使用时间戳，不再需要 isoformat
+                    # if isinstance(v, datetime):
+                    #     v = v.isoformat()
                     voobj[k] = v
                 except AttributeError:
                     pass

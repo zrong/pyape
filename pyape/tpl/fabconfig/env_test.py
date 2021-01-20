@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 env_test = {
     'deploy_dir': 'pyape_test',
     '_env': {

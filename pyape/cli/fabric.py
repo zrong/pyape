@@ -1,8 +1,9 @@
-# -*- coding: utf-8 -*-
 import re
 import logging
 import sys
+import os
 import json
+from typing import Optional
 from datetime import datetime
 
 from pathlib import Path
@@ -117,11 +118,13 @@ def merge(x, y):
 
 
 class ConfigBuilder(object):
-    def __init__(self, tplname, tpltarget, replaceobj, basedir):
+
+    def __init__(self, name: str, tplname: str, tpltarget: str, replaceobj: dict, basedir: Optional[Path]) -> None:
         """ 初始化
         :param tplname: 模版名称，不含扩展名
         :param dstname: 目测名称
         """
+        self.name = name
         self.tplname = tplname
         self.tplfile = tplname + '.jinja2'
         self.tpltarget = tpltarget
@@ -329,27 +332,52 @@ class Deploy(object):
             if localr.ok:
                 logger.warning('删除本地临时文件 %s', cb.tpltarget)
 
+    def _replace_environ_values(self, obj, key, value) -> None:
+        """ 执行具体的替换操作，支持递归
+        """
+        if isinstance(value, dict):
+            for k, v in value.items():
+                self._replace_environ_values(obj[key], k, v)
+        else:
+            environ_key = value.format(self.name.upper())
+            environ_value = os.environ.get(environ_key)
+            obj[key] = environ_value
+            logger.info(f'替换 {key} 环境变量：{environ_key}， 值：{environ_value}')
+
+    def _replace_values_from_environ(self, tplname, replaceobj: dict) -> None:
+        """ 从环境变量中替换值
+        """
+        # 找到配置中是否有相应的配置
+        replacer_name = f'{tplname}_value_environ_replacer'
+        value_environ_replacer = self.get_env_value(replacer_name)
+
+        if value_environ_replacer is None:
+            return
+        logger.info(f'找到了 {replacer_name}： {value_environ_replacer}')
+        for k, v in value_environ_replacer.items():
+            self._replace_environ_values(replaceobj, k, v)
+
     def put_tpl(self, tplname, baseobj, dstname=None, wrapkey=None, force=False, local=False):
         """ 基于 jinja2 模板生成配置文件
         :param wrapkey: 嵌套 dict 的键名。若提供，则将获取到的 replace 对象嵌套进入一个 dict  中，以 wrapkey 为键名
         :param dstname: 若提供，则使用 dstname 作为目标文件名，不提供则使用 tplname
         """
-        tplfile = tplname + '.jinja2'
         if dstname is None:
             dstname = tplname
         replaceobj = self._get_replaceobj(baseobj, tplname, wrapkey)
+        self._replace_values_from_environ(tplname, replaceobj)
 
         if self.name.startswith('local') or local:
             tpltarget = self.basedir.joinpath(dstname)
             logger.warning('tpltarget %s', tpltarget)
             if force or not tpltarget.exists():
-                cb = ConfigBuilder(tplname, str(tpltarget.resolve()), replaceobj, self.basedir)
+                cb = ConfigBuilder(self.name, tplname, str(tpltarget.resolve()), replaceobj, self.basedir)
                 cb.write_config_file()
                 logger.warning('覆盖本地配置文件 %s', tpltarget)
         else:
             # 需要创建一个临时文件用于上传
             tpltarget_local = str(self.basedir.joinpath(tplname + '.temp').resolve())
-            cb = ConfigBuilder(tplname, tpltarget_local, replaceobj, self.basedir)
+            cb = ConfigBuilder(self.name, tplname, tpltarget_local, replaceobj, self.basedir)
             self._put_tpl_remote(cb, self.get_remote_path(dstname), force)
 
     def rsync(self, exclude=[], is_windows=False):

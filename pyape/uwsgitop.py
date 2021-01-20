@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python
 ###########################################
 # 修改自 https://github.com/xrmx/uwsgitop

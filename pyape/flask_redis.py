@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # from flask-redis
 # https://github.com/underyx/flask-redis
 

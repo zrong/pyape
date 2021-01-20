@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 pyape.app.vofun
 ~~~~~~~~~~~~~~~~~~~
@@ -6,7 +5,7 @@ pyape.app.vofun
 对 ValueObject 的操作封装
 """
 
-from datetime import datetime, timezone, timedelta
+import time
 
 from pyape.util.func import parse_int
 from pyape import gconfig
@@ -100,7 +99,7 @@ def valueobject_get(r, vid, name, merge, withcache, return_dict=False):
     return responseto(vo=vo, return_dict=return_dict)
 
 
-def valueobject_add(r, withcache, name, value, votype, status=None, index=None, note=None, valuetype=None, offset=0, return_dict=False):
+def valueobject_add(r, withcache, name, value, votype, status=None, index=None, note=None, valuetype=None, return_dict=False):
     """ 增加一个 VO
     """
     if name is None or value is None or votype is None:
@@ -121,13 +120,15 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
     if votype is None:
         return responseto(message='请提供 votype!', code=401, error=True, return_dict=return_dict)
 
+    now = int(time.time())
     voitem = ValueObject(name=name,
         value=value,
         status=status if status is not None else 1,
         index=index if index is not None else 0,
         r=r,
         votype=votype,
-        updatetime=datetime.now(timezone(timedelta(hours=offset))),
+        createtime=now,
+        updatetime=now,
         note=note)
 
     resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
@@ -140,7 +141,7 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
     return responseto(vo=voitem, error=False, code=200, return_dict=return_dict)
 
 
-def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None, status=None, index=None, note=None, valuetype=None, offset=0, return_dict=False):
+def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None, status=None, index=None, note=None, valuetype=None, return_dict=False):
     """ 更新一个 VO
     """
     if vid is not None:
@@ -173,7 +174,7 @@ def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None,
     if voitem is None:
         return responseto(message='找不到 vo!', code=404, error=True, return_dict=return_dict)
 
-    voitem.updatetime = datetime.now(timezone(timedelta(hours=offset)))
+    voitem.updatetime = int(time.time())
 
     # 只有明确提供了 status 才设置它
     # 不处理 votype/r ，因为已经创建了的 VO 不允许修改这些关键分类的值

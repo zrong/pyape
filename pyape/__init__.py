@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-__version__ = '0.1.21'
+__version__ = '0.2.1'
 
 from functools import wraps
 
@@ -13,7 +12,7 @@ from pyape.config import GlobalConfig
 gconfig = None
 
 
-def init(gconfig, init_app_method=None, cls_config=None):
+def init(gconfig: GlobalConfig, init_app_method=None, cls_config=None):
     """ 初始化 APP
     :param gconfig: pyape.config.GlobalConfig 的实例
     :param init_app: 外部初始化方法
@@ -49,7 +48,7 @@ def init(gconfig, init_app_method=None, cls_config=None):
     return pyape_app
 
 
-def init_decorator(gconfig, cls_config=None):
+def init_decorator(gconfig: GlobalConfig, cls_config=None):
     """ 初始化 APP 的装饰器版本
     :param gconfig: pyape.config.GlobalConfig 的实例
     :param init_app: 外部初始化方法
@@ -85,7 +84,7 @@ def init_decorator(gconfig, cls_config=None):
             # 1. 导入外部的 models
             # 2. 创建数据库
             # 这里不传递 *args 这个参数，因为在 uwsgi 中这个参数有不少来自于服务器的值，
-            # 这会导致 f 调用失败，f 仅接受 db 和 mjpapp 两个参数
+            # 这会导致 f 调用失败，f 仅接受 gdb 和 pyape_app 两个参数
             decorated_return = f(**kwargs)
 
             # blueprint 要 import gdb，因此要在 gdb 之后注册

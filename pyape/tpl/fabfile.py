@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 部署 pyape app
 ~~~~~~~~~~~~~~~~~~~
@@ -68,10 +67,10 @@ def putenv(c, env, local=False):
 
 @task
 def putpy(c, env, local=False):
-    """ 生成 .py 并上传
+    """ 生成 gunicorn.conf.py 并上传
     """
     d = Deploy(env, enviroments, c, basedir)
-    d.put_tpl('gunicorn_conf_py', _env, dstname='gunicorn.conf.py', force=True, local=local)
+    d.put_tpl('gunicorn_conf_py', gunicorn_conf_py, dstname='gunicorn.conf.py', force=True, local=local)
 
 
 @task

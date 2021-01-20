@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import logging 
 from logging.handlers import WatchedFileHandler
 from pathlib import Path

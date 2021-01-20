@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 pyape.util.func
 ~~~~~~~~~~~~~~~~~~~
@@ -8,9 +7,7 @@ pyape.util.func
 这个类应该可以被其它模块导入而不发生冲突
 """
 
-import os
 from datetime import datetime, timedelta, date, time as time2
-import time
 import re
 import json
 
