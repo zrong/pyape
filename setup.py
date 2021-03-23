@@ -60,7 +60,7 @@ setup(
     url = "https://github.com/zrong/pyape",
     license = "BSD 3",
     keywords = "development zrong flask wechat",
-    python_requires='>=3.6, <4',
+    python_requires='>=3.9, <4',
     packages = find_packages(exclude=['test*', 'doc*', 'fabric']),
     install_requires=find_requires('requirements.txt'),
     entry_points=entry_points,

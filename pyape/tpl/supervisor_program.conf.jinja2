@@ -1,5 +1,5 @@
 [program:{{name}}]
-command={{cwd}}/venv/bin/pyzog start -c {{config_file}}
+command={{cwd}}/venv/bin/gunicorn --config {{cwd}}/gunicorn.conf.py {{app_module}}
 process_name=%(program_name)s
 numprocs=1
 directory={{cwd}}
@@ -10,7 +10,7 @@ autostart=true                ; start at supervisord start (default: true)
 ;startretries=3                ; max # of serial start failures when starting (default 3)
 autorestart=unexpected        ; when to restart if exited after running (def: unexpected)
 ;exitcodes=0                   ; 'expected' exit codes used with autorestart (default 0)
-stopsignal=QUIT               ; signal used to kill process (default TERM)
+stopsignal=TERM               ; signal used to kill process (default TERM)
 ;stopwaitsecs=10               ; max num secs to wait b4 SIGKILL (default 10)
 ;stopasgroup=false             ; send stop signal to the UNIX process group (default false)
 ;killasgroup=false             ; SIGKILL the UNIX process group (def false)

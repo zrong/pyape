@@ -94,8 +94,8 @@ def copy(all, name, dst, force, rename):
     else:
         dst = Path(dst)
     if all:
-        for tplfile in files.values():
-            copytplfile(tplfile, dst, force, rename)
+        for key, tplfile in files.items():
+            copytplfile(tpldir, dst, key, tplfile, force, rename)
     else:
         for key in name:
             if not key in files.keys():
@@ -180,15 +180,15 @@ GEN_PROGRAM_CONF_HELP = '生成 supervisord 的 program 配置文件'
 
 @click.command(help=GEN_PROGRAM_CONF_HELP)
 @click.option('-n', '--name', required=True, type=str, help='Supervisor program 名称')
-@click.option('-c', '--config_file', required=True, type=click.Path(file_okay=True, readable=True))
 @click.option('-u', '--user', required=False, type=str, help='Supervisor program 的 user')
-def genprog(name, config_file, user):
+@click.option('-c', '--app-module', default='uwsgi:pyape_app', type=str, help='Supervisor 启动的 flask 进程之 app_module')
+def genprog(name, app_module, user):
     try:
         cwdpath = Path().cwd()
         replaceobj = {
             'cwd': cwdpath.resolve(),
             'name': name,
-            'config_file': config_file,
+            'app_module': app_module,
         }
         if user is not None:
             replaceobj['user'] = user
