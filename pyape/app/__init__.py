@@ -17,20 +17,6 @@ from pyape.flask_redis import FlaskRedis
 from pyape.flask_extend import PyapeFlask, PyapeResponse, FlaskConfig
 
 
-# 全局的数据库引用，保存的是 PyapeDB 的实例
-gdb = None
-
-# grc 就是 Global Redis Client 的缩写，pyape.flask_redis.FlaskRedis 的实例
-grc = None
-
-# 全局缓存实例，pyape.cache.GlobalCache 的实例
-gcache = None
-
-# 就是 flas.app.logger 放在这里不必引用 current_app，参考：
-# https://flask.palletsprojects.com/en/1.1.x/logging/
-logger = logging.getLogger(__name__)
-
-
 class PyapeDB(SQLAlchemy):
 
     def __init__(self, **kwargs):
@@ -168,6 +154,20 @@ class PyapeRedis(FlaskRedis):
             bind_key_redis = robj.get('bind_key_redis')
             clients[r] = rc_clients[bind_key_redis]
         return clients
+
+
+# 全局的数据库引用，保存的是 PyapeDB 的实例
+gdb: PyapeDB = None
+
+# grc 就是 Global Redis Client 的缩写，pyape.flask_redis.FlaskRedis 的实例
+grc: PyapeRedis = None
+
+# 全局缓存实例，pyape.cache.GlobalCache 的实例
+gcache: GlobalCache = None
+
+# 就是 flas.app.logger 放在这里不必引用 current_app，参考：
+# https://flask.palletsprojects.com/en/1.1.x/logging/
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def init_db(pyape_app):

@@ -6,9 +6,6 @@ pyape.http.cdn
 处理CDN
 """
 
-import hashlib
-import requests
-from threading import Thread
 from pyape.app import logger
 
 
@@ -43,7 +40,7 @@ class CDN(object):
 class Upyun(CDN):
 
     def _build_upyun(self):
-    import upyun
+        import upyun
         return upyun.UpYun(self.cdn_cfg.get('bucket'), self.cdn_cfg.get('username'), self.cdn_cfg.get('password'))
 
     def delfile(self, file_path):

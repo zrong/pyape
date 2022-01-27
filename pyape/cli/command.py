@@ -181,7 +181,7 @@ GEN_PROGRAM_CONF_HELP = '生成 supervisord 的 program 配置文件'
 @click.command(help=GEN_PROGRAM_CONF_HELP)
 @click.option('-n', '--name', required=True, type=str, help='Supervisor program 名称')
 @click.option('-u', '--user', required=False, type=str, help='Supervisor program 的 user')
-@click.option('-c', '--app-module', default='uwsgi:pyape_app', type=str, help='Supervisor 启动的 flask 进程之 app_module')
+@click.option('-c', '--app-module', default='wsgi:pyape_app', type=str, help='Supervisor 启动的 flask 进程之 app_module')
 def genprog(name, app_module, user):
     try:
         cwdpath = Path().cwd()

@@ -1,5 +1,5 @@
-import requests
-from requests import Timeout
+import httpx 
+from httpx import TimeoutException
 
 
 class Req(object):
@@ -102,14 +102,14 @@ class Req(object):
             if url is None:
                 return self.geterrormsg('没有找到 URL 配置，请检查！')
             if method == 'get':
-                resp = requests.get(url, params=data, timeout=self._timeout)
+                resp = httpx.get(url, params=data, timeout=self._timeout)
             else:
                 # 仅 post 支持 json
                 if json:
-                    resp = requests.post(url, json=data, timeout=self._timeout)
+                    resp = httpx.post(url, json=data, timeout=self._timeout)
                 else:
-                    resp = requests.post(url, data=data, timeout=self._timeout)
-        except Timeout as e:
+                    resp = httpx.post(url, data=data, timeout=self._timeout)
+        except TimeoutException as e:
             self.error(str(e))
             return self.geterrormsg(str(e), True)
         except ConnectionError as e:

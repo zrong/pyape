@@ -346,6 +346,18 @@ class Deploy(object):
 
     def _replace_values_from_environ(self, tplname, replaceobj: dict) -> None:
         """ 从环境变量中替换值
+        例如，指定配置
+
+        env_prod: {
+            'config_json_value_environ_replacer': {
+                'FLASK': {
+                    'SQLALCHEMY_DATABASE_URI': 'AID_{}_SQLALCHEMY_DATABASE_URI',
+                    'SECRET_KEY': 'AID_{}_SECRET_KEY',
+                }
+            }
+        }
+        
+        在生成 prod 的配置文件时，会自动在环境变量中寻找 AID_PROD_SECRET_KEY 来替换 SECRET_KEY 的值
         """
         # 找到配置中是否有相应的配置
         replacer_name = f'{tplname}_value_environ_replacer'
@@ -564,6 +576,7 @@ class SupervisorGunicornDeploy(Deploy):
     def stop(self):
         """ 停止 API 进程
         """
+        pidfile = self.get_pid_file()
         # 删除 pidfile 以便下次启动
         if pidfile is not None:
             self.conn.run('rm %s' % pidfile)

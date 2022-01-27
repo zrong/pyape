@@ -10,6 +10,7 @@ import random
 from datetime import datetime
 
 from pyape.util import md5txt
+from pyape.util.encrypt import Encrypt
 
 
 def gen_nonce(k=8, chars=string.ascii_letters + string.digits):
@@ -77,3 +78,9 @@ def gen_sign(**kwargs):
             continue
         k_eq_v.append(str(k) + '=' + str(value))
     return md5txt('&'.join(k_eq_v))
+
+
+def gen_secret_key() -> str:
+    """ 生成 FLASK 可以使用的 SECRET_KEY
+    """
+    return Encrypt.fernet_key().decode()

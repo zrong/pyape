@@ -1,4 +1,4 @@
-__version__ = '0.2.2'
+__version__ = '0.2.4'
 
 from functools import wraps
 
@@ -9,7 +9,7 @@ import pyape.uwsgiproxy
 from pyape.config import GlobalConfig
 
 
-gconfig = None
+gconfig: GlobalConfig = None
 
 
 def init(gconfig: GlobalConfig, init_app_method=None, cls_config=None):

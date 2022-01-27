@@ -177,7 +177,7 @@ class GlobalConfig(object):
         jsonf = self.getdir(filename, basedir=basedir)
         jsonf.write_text(json.dumps(data_dict, ensure_ascii=False, indent=2))
             
-    def getdir(self, *args, basedir=None):
+    def getdir(self, *args, basedir=None) -> Path:
         """ 基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
         如果传递 basedir，就基于这个 basedir 创建路径
         """
