@@ -1,7 +1,7 @@
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
-basedir = Path(__file__).parent
+base_dir = Path(__file__).parent
 
 # 所有的模版文件配置
 tplconfs = {
@@ -48,7 +48,7 @@ def create_from_jinja(tplname, tpltarget=None, replaceobj={}):
         raise ValueError('没有找到名为 %s 的模版文件！' % tplname)
     robj = dict(tplconf['default'])
     robj.update(replaceobj)
-    tplenv = Environment(loader=FileSystemLoader(basedir.resolve()))
+    tplenv = Environment(loader=FileSystemLoader(base_dir.resolve()))
     tpl = tplenv.get_template(tplconf['tpl'])
     text = tpl.render(robj)
     if isinstance(tpltarget, Path):

@@ -17,6 +17,7 @@ logger = logging.Logger('fabric', level=logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
+
 class Tmux(object):
     """Tmux helper for fabric 2"""
     def __init__(self, runner, session_name='default'):
@@ -153,15 +154,26 @@ class ConfigBuilder(object):
 
 
 class Deploy(object):
-    def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
+    env_name: str = None
+    pyape_conf: dict = None
+    envs: dict = None
+    basedir: Path = None
+    conn: Connection = None
+    deploy_dir: Path = None
+    pye: str = None
+
+    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
         """ 初始化
         """
-        self.name = name
-        self.envs = envs
+        self.env_name = env_name
+        self.pyape_conf = pyape_conf
+        self.envs = pyape_conf['ENV']
         self.conn = conn
         self.basedir = Path(basedir)
-        self.deploy_root_dir = Path(deploy_root_dir)
-        self.pye = pye
+        self.pye = pyape_conf['pye']
+
+        self.check_env_name()
+        self.deploy_dir = Path(self.replace_value(pyape_conf['deploy_dir']))
 
     def check_remote_conn(self):
         """ 确保当前提供的 conn 是远程版本
@@ -177,18 +189,18 @@ class Deploy(object):
         # logger.info('get_remote_path deploy_path: %s, deploy_root_dir: %s', deploy_path, self.deploy_root_dir)
         if deploy_path.is_absolute():
             return str(deploy_path.joinpath(*args).resolve())
-        return str(self.deploy_root_dir.joinpath(deploy_path, *args))
+        return str(self.deploy_dir.joinpath(deploy_path, *args))
 
     def check_env_name(self):
-        if self.name is None:
+        if self.env_name is None:
             raise Exit('请使用 --env 参数指定一个环境名称！')
         keys = self.envs.keys()
-        if not self.name in self.envs: 
+        if not self.env_name in self.envs: 
             raise Exit('--env 参数值范围： \n\n%s' % '\n'.join(keys))
 
     def get_env_value(self, key=None, default_value=None):
         self.check_env_name()
-        value = self.envs.get(self.name)
+        value = self.envs.get(self.env_name)
         if value and key is not None:
             return value.get(key, default_value)
         return value
@@ -251,7 +263,7 @@ class Deploy(object):
         """ 创建远程服务器的运行环境
         """
         deploy_dir_path = Path(deploy_dir)
-        for d in [ self.deploy_root_dir,
+        for d in [ self.deploy_dir,
             deploy_dir,
             deploy_dir_path.joinpath('logs'),
             deploy_dir_path.joinpath('output') ]:
@@ -339,7 +351,7 @@ class Deploy(object):
             for k, v in value.items():
                 self._replace_environ_values(obj[key], k, v)
         else:
-            environ_key = value.format(self.name.upper())
+            environ_key = value.format(self.env_name.upper())
             environ_value = os.environ.get(environ_key)
             obj[key] = environ_value
             logger.info(f'替换 {key} 环境变量：{environ_key}， 值：{environ_value}')
@@ -369,28 +381,35 @@ class Deploy(object):
         for k, v in value_environ_replacer.items():
             self._replace_environ_values(replaceobj, k, v)
 
-    def put_tpl(self, tplname, baseobj, dstname=None, wrapkey=None, force=False, local=False):
+    def put_tpl(self, tplname, dstname=None, wrapkey=None, force=False, local=False):
         """ 基于 jinja2 模板生成配置文件
         :param wrapkey: 嵌套 dict 的键名。若提供，则将获取到的 replace 对象嵌套进入一个 dict  中，以 wrapkey 为键名
         :param dstname: 若提供，则使用 dstname 作为目标文件名，不提供则使用 tplname
         """
+        # TODO
+        baseobj = None
         if dstname is None:
             dstname = tplname
         replaceobj = self._get_replaceobj(baseobj, tplname, wrapkey)
         self._replace_values_from_environ(tplname, replaceobj)
 
-        if self.name.startswith('local') or local:
+        if self.env_name.startswith('local') or local:
             tpltarget = self.basedir.joinpath(dstname)
             logger.warning('tpltarget %s', tpltarget)
             if force or not tpltarget.exists():
-                cb = ConfigBuilder(self.name, tplname, str(tpltarget.resolve()), replaceobj, self.basedir)
+                cb = ConfigBuilder(self.env_name, tplname, str(tpltarget.resolve()), replaceobj, self.basedir)
                 cb.write_config_file()
                 logger.warning('覆盖本地配置文件 %s', tpltarget)
         else:
             # 需要创建一个临时文件用于上传
             tpltarget_local = str(self.basedir.joinpath(tplname + '.temp').resolve())
-            cb = ConfigBuilder(self.name, tplname, tpltarget_local, replaceobj, self.basedir)
+            cb = ConfigBuilder(self.env_name, tplname, tpltarget_local, replaceobj, self.basedir)
             self._put_tpl_remote(cb, self.get_remote_path(dstname), force)
+            
+    def put_config(self, force: bool=False, local: bool=False) -> None:
+        self.put_tpl('config.toml', dstname='config.toml', force=force, local=local)
+        self.put_tpl('.env', dstname='.env', wrapkey='options', force=force, local=local)
+        self.put_tpl('gunicorn.conf.py', dstname='gunicorn.conf.py', force=force, local=local)
 
     def rsync(self, exclude=[], is_windows=False):
         """ 部署最新程序到远程服务器
@@ -418,15 +437,15 @@ class Deploy(object):
                 logger.warning('找不到远程 log 文件 %s', logf)
                 continue
             logp = Path(logf)
-            local_file = self.basedir.joinpath('logs', '{name}_{basename}_{times}{extname}'.format(name=self.name, times=time_string, basename=logp.name, extname=logp.suffix))
+            local_file = self.basedir.joinpath('logs', '{name}_{basename}_{times}{extname}'.format(name=self.env_name, times=time_string, basename=logp.name, extname=logp.suffix))
             self.conn.get(logf, local=local_file)
 
 
 class UwsgiDeploy(Deploy):
     """ 使用 uWSGI 来部署服务
     """
-    def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
-        super().__init__(name, envs, conn, basedir, deploy_root_dir, pye)
+    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
+        super().__init__(env_name, pyape_conf, conn, basedir)
 
     def get_fifo_file(self):
         """ 使用 master-fifo 来管理进程
@@ -484,8 +503,8 @@ class UwsgiDeploy(Deploy):
 class GunicornDeploy(Deploy):
     """ 使用 Gunicorn 来部署服务
     """
-    def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
-        super().__init__(name, envs, conn, basedir, deploy_root_dir, pye)
+    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
+        super().__init__(env_name, pyape_conf, conn, basedir)
 
     def get_pid_file(self):
         """ 使用 pidfile 来判断进程是否启动
@@ -553,8 +572,8 @@ class GunicornDeploy(Deploy):
 class SupervisorGunicornDeploy(Deploy):
     """ 使用 Supervisor + Gunicorn(非 daemon 模式) 来部署服务
     """
-    def __init__(self, name, envs, conn, basedir=None, deploy_root_dir='/srv/app', pye='python3'):
-        super().__init__(name, envs, conn, basedir, deploy_root_dir, pye)
+    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
+        super().__init__(env_name, pyape_conf, conn, basedir)
 
     def get_pid_file(self):
         """ 使用 pidfile 来判断进程是否启动

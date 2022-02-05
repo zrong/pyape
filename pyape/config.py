@@ -43,7 +43,7 @@ class PYConf(dict):
     def __delattr__(self, name):
         del self[name]
 
-    def copy_from_dict(self, adict, parent=None):
+    def copy_from_dict(self, adict: dict, parent=None) -> None:
         """从一个已经存在的 dict 中复制所有的值。
 
         :param adict: 被复制的 dict。
@@ -57,9 +57,9 @@ class PYConf(dict):
             parent = self
         for k,v in adict.items():
             if isinstance(v, dict):
-                vDict = PYConf(v)
-                self.copy_from_dict(v, vDict)
-                parent[k] = vDict
+                vconf = PYConf(v)
+                self.copy_from_dict(v, vconf)
+                parent[k] = vconf
             else:
                 parent[k] = v
 
