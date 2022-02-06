@@ -45,7 +45,7 @@ entry_points = {
 }
 
 package_data = {
-    'pyape.tpl' : ['*.jinja2', '*.py', 'fabconfig/*.py']
+    'pyape.tpl' : ['*.jinja2', '*.py', '*.toml', '.gitignore']
 }
 
 

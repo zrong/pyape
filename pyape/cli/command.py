@@ -3,7 +3,6 @@
 # 提供 pyape 初始化的命令行工具
 ###########################################
 
-from dataclasses import replace
 import os
 import json
 import shutil
@@ -15,7 +14,7 @@ import toml
 import jinja2
 import click
 
-from pyape.tpl import create_from_jinja, base_dir as pyape_tpl_dir
+from pyape.tpl import base_dir as pyape_tpl_dir
 
 
 # pyape 安装所在的文件夹
@@ -23,18 +22,53 @@ from pyape.tpl import create_from_jinja, base_dir as pyape_tpl_dir
 # 找到 tpl 文件夹所在地
 # tpl_dir = module_dir.joinpath('tpl')
 
-files = {
-    'dotenv': '_env.jinja2',
-    'uwsgi': 'uwsgi_ini.jinja2',
-    'gunicorn': 'gunicorn_conf_py.jinja2',
-    'gunicorn_nginx': 'gunicorn_nginx.conf.jinja2',
+MAIN_PROJECT_FILES = {
     'fabfile': 'fabfile.py',
     'wsgi': 'wsgi.py',
     'readme': 'README.md',
+    'pyape': 'pyape.toml',
+    'gitignore': '.gitignore',
 }
 
-
+MAIN_CONFIG_FILES = ['.env', 'uwsgi.ini', 'gunicorn.conf.py', 'PYAPE']
+SUPERVISOR_TPL_FILES = ['supervisor_program.conf', 'supervisord.service', 'supervisord.conf']
 REPLACE_ENVIRON = ['ADMIN_NAME', 'ADMIN_PASSWORD', 'SECRET_KEY', 'SQLALCHEMY_DATABASE_URI']
+
+
+def get_pyape_toml_file(cwd: Path=None) -> Path:
+    cwd = cwd or Path.cwd()
+    return cwd.joinpath('pyape.toml')
+
+
+def get_pyape_toml(pyape_toml: Path) -> tuple[bool, dict]:
+    """ 获取主配置文件 pyape.toml 并进行简单的检测
+    """
+    err = None
+    try:
+        pyape_conf = toml.load(pyape_toml)
+        pyape_conf['rsync_exclude']
+        pyape_conf['name']
+        pyape_conf['pye']
+        pyape_conf['deploy_dir']
+        return True, pyape_conf
+    except FileNotFoundError:
+        err = 'Please call "pyape init" to generate a "pyape.toml" file.'
+    except toml.TomlDecodeError as e:
+        err = f'Decode {pyape_toml.resolve()} error: {e}'
+    except KeyError as e:
+        err = f'Key error: {e.args[0]}'
+    return False, err
+    
+
+def check_pyape_toml(cwd: str, ctx: click.Context) -> dict:
+    cwd = Path(cwd)
+    toml_file = get_pyape_toml_file(cwd)
+    if not toml_file.exists():
+        ctx.fail(f'Please call "pyape init" to generate file "{toml_file.as_posix()}"')
+    succ, pyape_conf = get_pyape_toml(toml_file)
+    if not succ:
+        ctx.fail(pyape_conf)
+    return cwd, pyape_conf
 
 
 def merge_dict(x: dict, y: dict, z: dict=None) -> dict:
@@ -80,7 +114,6 @@ def merge_dict(x: dict, y: dict, z: dict=None) -> dict:
 
 
 class ConfigWriter(object):
-
     def __init__(self, tpl_name: str, dst_file: Path, replace_obj: dict, tpl_dir: Optional[Path]) -> None:
         """ 初始化
         :param tplname: 模版名称，不含扩展名
@@ -92,20 +125,28 @@ class ConfigWriter(object):
         self.replace_obj = replace_obj
         self.tpl_dir = tpl_dir or pyape_tpl_dir
 
-    def create_from_jinja(self):
+    def _write_by_jinja(self):
         """ 调用 jinja2 直接渲染
         """
         tplenv = jinja2.Environment(loader=jinja2.FileSystemLoader(self.tpl_dir))
         tpl = tplenv.get_template(self.tpl_filename)
         self.dst_file.write_text(tpl.render(self.replace_obj))
+    
+    def _write_key_value(self):
+        """ 输出 key = value 形式的文件
+        """
+        txt = '\n'.join([f'{k} = {v}' for k, v in self.replace_obj.items()])
+        self.dst_file.write_text(txt)
 
     def write_config_file(self):
         if self.tpl_name.endswith('.json'):
             self.dst_file.write_text(json.dumps(self.replace_obj, ensure_ascii=False, indent=4))
         elif self.tpl_name.endswith('.toml'):
             self.dst_file.write_text(toml.dumps(self.replace_obj))
+        elif self.tpl_name == '.env':
+            self._write_key_value()
         else:
-            self.create_from_jinja()
+            self._write_by_jinja()
 
 
 class ConfigReplacer(object):
@@ -153,13 +194,20 @@ class ConfigReplacer(object):
         :param merge: 是否合并，对于已知的标量，应该选择不合并
         :param wrap_key: 是否做一个包装。如果提供，则会将提供的值作为 key 名，在最终值之上再包装一层
         """
+        print('='* 20)
+        print(f'get_tpl_value pyape_conf: {json.dumps(self.pyape_conf)}')
+        print(f'get_tpl_value env_name: {self.env_name}')
         base_obj = self.pyape_conf.get(tpl_name, None)
         update_obj = self.get_env_value(tpl_name)
         repl_obj = None
+        print(f'get_tpl_value tpl_name: {tpl_name}')
+        print(f'get_tpl_value base_obj: {base_obj}')
+        print(f'get_tpl_value update_obj: {update_obj}')
         if merge:
             repl_obj = merge_dict(base_obj or {}, update_obj or {})
         else:
             repl_obj = update_obj or base_obj
+        print(f'get_tpl_value repl_obj: {repl_obj}')
         return {wrap_key: repl_obj} if wrap_key else repl_obj
 
     def replace(self, value: str) -> str:
@@ -174,14 +222,21 @@ class ConfigReplacer(object):
         if isinstance(self.deploy_dir, Path):
             replace_obj['DEPLOY_DIR'] = self.deploy_dir.as_posix()
         # 获取环境变量中的替换值
+        environ_keys = {}
         for n in REPLACE_ENVIRON:
             # PYAPE_LOCAL_NAME
             environ_key = f'{self.pyape_name.upper()}_{self.env_name.upper()}_{n}'
+            environ_keys[n] = environ_key
             environ_value = os.environ.get(environ_key)
             if environ_value is not None:
                 replace_obj[n] = environ_value
-        new_value = value.format_map(replace_obj)
-        return new_value
+        try:
+            new_value = value.format_map(replace_obj)
+            return new_value
+        except KeyError as e:
+            # 抛出对应的 environ key 的错误
+            raise KeyError(environ_keys.get(e.args[0]))
+            
 
     def get_env_value(self, key=None, default_value=None):
         value = self.envs.get(self.env_name)
@@ -190,9 +245,13 @@ class ConfigReplacer(object):
         return value
 
 
-def write_config_file(env_name: str, pyape_conf: dict, tpl_name: str, work_dir: Path, tpl_dir: Path=None) -> None:
+def write_config_file(env_name: str, pyape_conf: dict, tpl_name: str, work_dir: Path, tpl_dir: Path=None, target_postfix: str='') -> None:
+    """ 写入配置文件
+    :param target_postfix: 配置文件的后缀
+    """
     replacer = ConfigReplacer(env_name, pyape_conf, work_dir=work_dir, tpl_dir=tpl_dir)
     replace_obj = replacer.get_tpl_value(tpl_name)
+    print(f'write_config_file {tpl_name} {replace_obj}')
     replace_str = toml.dumps(replace_obj)
     # 将 obj 转换成 toml 字符串，进行一次替换，然后再转换回 obj
     # 采用这样的方法可以不必处理复杂的层级关系
@@ -200,7 +259,7 @@ def write_config_file(env_name: str, pyape_conf: dict, tpl_name: str, work_dir: 
     # 如果 tpl_name 是 pyape，代表要生成 config.toml
     if tpl_name.lower() == 'pyape':
         tpl_name = 'config.toml'
-    writer = ConfigWriter(tpl_name, work_dir.joinpath(tpl_name), replace_obj, tpl_dir)
+    writer = ConfigWriter(tpl_name, work_dir.joinpath(f'{tpl_name}{target_postfix}'), replace_obj, tpl_dir)
     writer.write_config_file()
 
 
@@ -255,41 +314,32 @@ def main():
     pass
 
 
-
-@click.command(help='test')
-def test():
-    pass
-
-
 @click.command(help='复制 pyape 配置文件到当前项目中')
 @click.option('--all', '-A', default=False, is_flag=True, help='复制所有模版')
-@click.option('--dst', '-D', help='指定复制目标文件夹')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹，也就是复制目标文件夹。')
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
 @click.option('--rename', '-R', default=False, is_flag=True, help='若目标文件存在则重命名')
 @click.argument('name', nargs=-1)
-def copy(all, name, dst, force, rename):
-    if dst is None:
-        dst = Path.cwd()
-    else:
-        dst = Path(dst)
+def copy(all, name, cwd, force, rename):
+    cwd = Path(cwd)
     if all:
-        for key, tplfile in files.items():
-            copytplfile(pyape_tpl_dir, dst, key, tplfile, force, rename)
+        for key, tplfile in MAIN_PROJECT_FILES.items():
+            copytplfile(pyape_tpl_dir, cwd, key, tplfile, force, rename)
     else:
         for key in name:
-            if not key in files.keys():
-                st = click.style('仅支持以下名称： {0}'.format(' '.join(files.keys())), fg='red')
+            if not key in MAIN_PROJECT_FILES.keys():
+                st = click.style('仅支持以下名称： {0}'.format(' '.join(MAIN_PROJECT_FILES.keys())), fg='red')
                 click.echo(st, err=True)
                 continue
-            copytplfile(pyape_tpl_dir, dst, key, files[key], force, rename)
+            copytplfile(pyape_tpl_dir, cwd, key, MAIN_PROJECT_FILES[key], force, rename)
 
 
 @click.command(help='初始化 pyape 项目')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
-def init(force):
-    dst = Path.cwd()
-    for keyname, filename in files.items():
-        copytplfile(pyape_tpl_dir, dst, keyname, filename, force, False)
+def init(cwd, force):
+    for keyname, filename in MAIN_PROJECT_FILES.items():
+        copytplfile(pyape_tpl_dir, Path(cwd), keyname, filename, force, False)
 
 
 @click.command(help='展示 uwsgi 的运行情况。')
@@ -300,89 +350,36 @@ def top(address, frequency):
     pyape.uwsgitop.call(address, frequency)
 
 
-GEN_SUPE_HELP = '在当前文件夹下生成 supervisord.conf 配置文件'
-
-@click.command(help=GEN_SUPE_HELP)
-@click.option('-p', '--path', required=False, type=click.Path(), help='提供一个路径，配置中和路径相关的内容都放在这个路径下')
-@click.option('--unix-http-server-file', required=False, type=str)
-@click.option('--supervisord-logfile', required=False, type=str)
-@click.option('--supervisord-pidfile', required=False, type=str)
-@click.option('--supervisord-user', required=False, type=str)
-@click.option('--supervisord-directory', required=False, type=str)
-@click.option('--supervisorctl-serverurl', required=False, type=str)
-@click.option('--include-files', required=False, type=str)
-def gensupe(**kwargs):
-    try:
-        replaceobj = {}
-        path = kwargs.get('path')
-        if path is not None:
-            path = Path(path)
-            replaceobj['unix_http_server_file'] = str(path.joinpath('run', 'supervisord.sock').resolve())
-            replaceobj['supervisorctl_serverurl'] = 'unix://%s' % str(path.joinpath('run', 'supervisord.sock').resolve())
-            replaceobj['include_files'] = str(path.joinpath('conf.d').resolve()) + '/*.conf'
-            replaceobj['supervisord_logfile'] = str(path.joinpath('log', 'supervisord.log').resolve())
-            replaceobj['supervisord_pidfile'] = str(path.joinpath('run', 'supervisord.pid').resolve())
-            replaceobj['supervisord_directory'] = str(path.resolve())
-            
-        for k, v in kwargs.items():
-            if v is not None:
-                replaceobj[k] = v
-        name = 'supervisord'
-        cwdpath = Path().cwd()
-        create_from_jinja(name, cwdpath, replaceobj)
-    except Exception as e:
-        click.echo(click.style('生成错误：%s' % e, fg='red'), err=True)
-        raise click.Abort()
+@click.command(help='生成配置文件。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.option('--env_postfix', '-P', is_flag=True, help='在生成的配置文件名称末尾加上环境名称后缀。')
+@click.argument('files', nargs=-1, type=click.Choice(MAIN_CONFIG_FILES))
+@click.pass_context
+def config(ctx: click.Context, env: str, cwd: str, env_postfix: bool, files: tuple):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    # 若没有提供参数就生成所有的配置文件
+    config_files = files if len(files) > 0 else MAIN_CONFIG_FILES
+    for tpl_name in config_files:
+        write_config_file(env, pyape_conf, tpl_name, work_dir=cwd, target_postfix=f'.{env}' if env_postfix else '')
+        
 
 
-GEN_SYS_HELP = '在当前文件夹下生成 systemd 需要的 supervisord.service 配置文件'
-
-@click.command(help=GEN_SYS_HELP)
-@click.option('--supervisord-exec', required=False, type=str)
-@click.option('--supervisorctl-exec', required=False, type=str)
-@click.option('--supervisord-conf', required=False, type=str)
-def gensys(**kwargs):
-    try:
-        replaceobj = {}
-        for k, v in kwargs.items():
-            if v is not None:
-                replaceobj[k] = v
-        name = 'systemd'
-        cwdpath = Path().cwd()
-        create_from_jinja(name, cwdpath, replaceobj)
-    except Exception as e:
-        click.echo(click.style('生成错误：%s' % e, fg='red'), err=True)
-        raise click.Abort()
-
-
-GEN_PROGRAM_CONF_HELP = '生成 supervisord 的 program 配置文件'
-
-@click.command(help=GEN_PROGRAM_CONF_HELP)
-@click.option('-n', '--name', required=True, type=str, help='Supervisor program 名称')
-@click.option('-u', '--user', required=False, type=str, help='Supervisor program 的 user')
-@click.option('-c', '--app-module', default='wsgi:pyape_app', type=str, help='Supervisor 启动的 flask 进程之 app_module')
-def genprog(name, app_module, user):
-    try:
-        cwdpath = Path().cwd()
-        replaceobj = {
-            'cwd': cwdpath.resolve(),
-            'name': name,
-            'app_module': app_module,
-        }
-        if user is not None:
-            replaceobj['user'] = user
-        create_from_jinja('program', cwdpath.joinpath(name + '.conf'), replaceobj)
-    except Exception as e:
-        click.echo(click.style('生成错误 %s' % e, fg='red'), err=True)
-        raise click.Abort()
+@click.command(help='生成 Supervisor 需要的配置文件。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def supervisor(ctx, cwd, env):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    for tpl_name in SUPERVISOR_TPL_FILES:
+        write_config_file(env, pyape_conf, tpl_name, work_dir=cwd)
 
 
 main.add_command(copy)
 main.add_command(init)
 main.add_command(top)
-main.add_command(gensupe)
-main.add_command(gensys)
-main.add_command(genprog)
+main.add_command(supervisor)
+main.add_command(config)
 
 
 if __name__ == '__main__':

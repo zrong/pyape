@@ -15,9 +15,9 @@ Documentation=http://supervisord.org
 After=network.target
 
 [Service]
-ExecStart={{supervisord_exec}} -n -c {{supervisord_conf}}
-ExecStop={{supervisorctl_exec}} $OPTIONS shutdown
-ExecReload={{supervisorctl_exec}} $OPTIONS reload
+ExecStart={{exed}} -n -c {{exed_conf}}
+ExecStop={{exectl}} $OPTIONS shutdown
+ExecReload={{exectl}} $OPTIONS reload
 KillMode=process
 Restart=on-failure
 RestartSec=30s
