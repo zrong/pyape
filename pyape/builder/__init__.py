@@ -14,7 +14,6 @@ import toml
 # tpl_dir = module_dir.joinpath('tpl')
 
 MAIN_PROJECT_FILES = {
-    'fabfile': 'fabfile.py',
     'wsgi': 'wsgi.py',
     'readme': 'README.md',
     'pyape': 'pyape.toml',

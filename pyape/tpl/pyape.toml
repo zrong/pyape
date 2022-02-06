@@ -30,15 +30,20 @@ pye = 'python3'
 deploy_dir = '/srv/app/{NAME}'
 
 
-# 用于 fab deploy 上传时排除本地文件
+# 用于 deploy 上传时排除本地文件
 rsync_exclude = [
     '.DS_Store', '*.pyc', 'fab*', '__pycache__', '.pytest_cache',
     '.vscode', '*.code-workspace', '*.swp', '*.iml', 
     '.git', '.pyenv', 'venv', '.gitignore', 
     'wiki', 'output', 'tests', 'logs', 'wechat_sdk', 'flask_sqlalchemy',
-    '*.jinja2', '*.dot', '*.json', '*.toml',
+    '*.jinja2', '*.dot', '*.json', '*.toml', '*.sqlite', '*.db',
     'config.*', 'uwsgi.*', '*.service', 'gunicorn.*'
 ]
+
+# 用于 fabric 进行远程部署时候的配置
+['fabric']
+host = 'zengrong-net'
+user = 'app'
 
 # 若使用 supervisord 管理进程，使用下面的配置生成 supervisord.conf
 ['supervisord.conf']

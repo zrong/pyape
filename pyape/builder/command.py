@@ -6,12 +6,13 @@
 import shutil
 from pathlib import Path
 
-import toml
 import click
 
 from pyape.tpl import base_dir as pyape_tpl_dir
 from pyape.builder import get_pyape_toml, get_pyape_toml_file, MAIN_CONFIG_FILES, SUPERVISOR_TPL_FILES, MAIN_PROJECT_FILES
 from pyape.builder.conf import ConfigReplacer
+
+from fabric.connection import Connection
 
 
 def check_pyape_toml(cwd: str, ctx: click.Context) -> dict:
@@ -146,11 +147,126 @@ def supervisor(ctx, cwd, env):
         write_config_file(env, pyape_conf, tpl_name, work_dir=cwd)
 
 
+#---------------------------- 远程部署相关
+
+def _build_conn(env_name: str, pyape_conf: dict, cwd: Path) -> Connection:
+    replacer = ConfigReplacer(env_name, pyape_conf, cwd)
+    # 从 pyape.toml 配置中获取服务器地址
+    fabric_conf = replacer.get_tpl_value('fabric', merge=False)
+    return Connection(**fabric_conf)
+
+
+@click.command(help='生成并上传配置文件到远程服务器。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.option('--force', '-F', is_flag=True, help='是否强制覆盖已有的配置文件。')
+@click.pass_context
+def putconf(ctx, cwd, env, force):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    d.put_config(force=force)
+
+
+@click.command(help='部署远程服务器的虚拟环境。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.option('--init', '-I', is_flag=True, help='是否初始化虚拟环境。')
+@click.argument('upgrade', nargs=-1)
+@click.pass_context
+def venv(ctx, cwd, env, init: bool, upgrade: tuple):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    if init:
+        d.init_remote_venv()
+    if len(upgrade) > 0:
+        d.pipupgrade(names=upgrade)
+    else:
+        d.pipupgrade(all=True)
+
+
+@click.command(help='部署项目到远程服务器。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def deploy(ctx, cwd, env):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    d.rsync(exclude=pyape_conf['rsync_exclude'])
+    d.put_config(force=True)
+
+
+@click.command(help='在服务器上启动项目进程。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def start(ctx, cwd, env):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    d.start()
+
+
+@click.command(help='在服务器上停止项目进程。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def stop(ctx, cwd, env):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    d.stop()
+
+
+@click.command(help='在服务器上重载项目进程。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def reload(ctx, cwd, env):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    d.reload()
+
+
+@click.command(help='打印所有的过期的 python package。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def pipoutdated(ctx, cwd, env):
+    cwd, pyape_conf = check_pyape_toml(cwd, ctx)
+    conn = _build_conn(env, pyape_conf, cwd)
+
+    from pyape.builder.fabric import GunicornDeploy as Deploy
+    d = Deploy(env, pyape_conf, conn, cwd)
+    d.pipoutdated()
+
+
 main.add_command(copy)
 main.add_command(init)
 main.add_command(top)
 main.add_command(supervisor)
 main.add_command(config)
+main.add_command(deploy)
+main.add_command(putconf)
+main.add_command(start)
+main.add_command(stop)
+main.add_command(reload)
+main.add_command(pipoutdated)
 
 
 if __name__ == '__main__':

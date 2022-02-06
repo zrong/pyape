@@ -238,39 +238,36 @@ class Deploy(object):
             if mod_names:
                 self.conn.run('pip install -U ' + ' '.join(mod_names))
 
-    def put_tpl(self, tpl_name, force=False, local=False):
+    def put_tpl(self, tpl_name, force=False):
         """ 基于 jinja2 模板生成配置文件，根据 env 的值决定是否上传
         """
-        if self.env_name.startswith('local') or local:
-            self.replacer.set_writer(tpl_name, force=force)
-        else:
-            # 创建远程文件夹
-            self.make_remote_dir()
-            # 获取远程文件的绝对路径
-            target_remote = self.get_remote_path(tpl_name)
-            tpltarget_remote_exists = self.remote_exists(target_remote)
-            if force and tpltarget_remote_exists:
-                logger.warning('delete %s', target_remote)
-                remoter = self.conn.run(f'rm -f {target_remote}')
-                if remoter.ok:
-                    logger.warning(f'删除远程配置文件 {target_remote}')
-                tpltarget_remote_exists = False
+        # 创建远程文件夹
+        self.make_remote_dir()
+        # 获取远程文件的绝对路径
+        target_remote = self.get_remote_path(tpl_name)
+        tpltarget_remote_exists = self.remote_exists(target_remote)
+        if force and tpltarget_remote_exists:
+            logger.warning('delete %s', target_remote)
+            remoter = self.conn.run(f'rm -f {target_remote}')
+            if remoter.ok:
+                logger.warning(f'删除远程配置文件 {target_remote}')
+            tpltarget_remote_exists = False
+        
+        # 本地创建临时文件后上传
+        if force or not tpltarget_remote_exists:
+            # 创建一个临时文件用于上传，使用后缀
+            _, final_file = self.replacer.set_writer(tpl_name, force=force, target_postfix=f'.{self.env_name}')
+            self.conn.put(final_file, target_remote)
+            logger.warning('覆盖远程配置文件 %s', target_remote)
+            localrunner = runners.Local(self.conn)
+            # 删除本地的临时配置文件
+            localr = localrunner.run(f'rm -f {final_file.as_posix()}')
+            if localr.ok:
+                logger.warning(f'删除本地临时文件 {final_file.as_posix()}')
             
-            # 本地创建临时文件后上传
-            if force or not tpltarget_remote_exists:
-                # 创建一个临时文件用于上传，使用后缀
-                _, final_file = self.replacer.set_writer(tpl_name, force=force, target_postfix=f'.{self.env_name}')
-                self.conn.put(final_file, target_remote)
-                logger.warning('覆盖远程配置文件 %s', target_remote)
-                localrunner = runners.Local(self.conn)
-                # 删除本地的临时配置文件
-                localr = localrunner.run(f'rm -f {final_file.as_posix()}')
-                if localr.ok:
-                    logger.warning(f'删除本地临时文件 {final_file.as_posix()}')
-            
-    def put_config(self, force: bool=False, local: bool=False) -> None:
+    def put_config(self, force: bool=False) -> None:
         for tpl_name in MAIN_CONFIG_FILES:
-            self.put_tpl(tpl_name, force, local)
+            self.put_tpl(tpl_name, force)
 
     def rsync(self, exclude=[], is_windows=False):
         """ 部署最新程序到远程服务器
@@ -305,8 +302,8 @@ class Deploy(object):
 class UwsgiDeploy(Deploy):
     """ 使用 uWSGI 来部署服务
     """
-    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
-        super().__init__(env_name, pyape_conf, conn, basedir)
+    def __init__(self, env_name, pyape_conf, conn, work_dir: Path=None):
+        super().__init__(env_name, pyape_conf, conn, work_dir)
 
     def get_fifo_file(self):
         """ 使用 master-fifo 来管理进程
@@ -364,8 +361,8 @@ class UwsgiDeploy(Deploy):
 class GunicornDeploy(Deploy):
     """ 使用 Gunicorn 来部署服务
     """
-    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
-        super().__init__(env_name, pyape_conf, conn, basedir)
+    def __init__(self, env_name, pyape_conf, conn, work_dir: Path=None):
+        super().__init__(env_name, pyape_conf, conn, work_dir)
 
     def get_pid_file(self):
         """ 使用 pidfile 来判断进程是否启动
@@ -433,8 +430,8 @@ class GunicornDeploy(Deploy):
 class SupervisorGunicornDeploy(Deploy):
     """ 使用 Supervisor + Gunicorn(非 daemon 模式) 来部署服务
     """
-    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
-        super().__init__(env_name, pyape_conf, conn, basedir)
+    def __init__(self, env_name, pyape_conf, conn, work_dir: Path=None):
+        super().__init__(env_name, pyape_conf, conn, work_dir)
 
     def get_pid_file(self):
         """ 使用 pidfile 来判断进程是否启动
