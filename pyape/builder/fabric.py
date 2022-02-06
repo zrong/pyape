@@ -3,7 +3,7 @@ import logging
 import sys
 import os
 import json
-from typing import Optional
+from typing import Optional, final
 from datetime import datetime
 
 from pathlib import Path
@@ -12,10 +12,12 @@ from invoke import runners
 from invoke.exceptions import Exit
 from fabric import Connection
 
+from pyape.builder import MAIN_CONFIG_FILES
+from pyape.builder.conf import  ConfigReplacer
+
 
 logger = logging.Logger('fabric', level=logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
-
 
 
 class Tmux(object):
@@ -92,88 +94,30 @@ class Tmux(object):
             self.wait_for(run_name)
 
 
-def merge(x, y):
-    """ 仅支持一级嵌套
-    gparam x:
-    :param y:
-    :return:
-    """
-    # logger.info('合并配置项，初始值: \n%s', x)
-    # logger.warning('合并配置项，覆盖值：\n%s' % y)
-    z = {}
-    for xk, xv in x.items():
-        if isinstance(xv, dict):
-            new_xv = xv.copy()
-            yv = y.get(xk)
-            if yv is not None:
-                new_xv.update(yv)
-            z[xk] = new_xv
-        else:
-            yv = y.get(xk, None)
-            z[xk] = xv if yv is None else yv
-    for yk, yv in y.items():
-        if x.get(yk) is None:
-            z[yk] = yv
-    # logger.info('合并配置项，最终值: \n%s', z)
-    return z
-
-
-class ConfigBuilder(object):
-
-    def __init__(self, name: str, tplname: str, tpltarget: str, replaceobj: dict, basedir: Optional[Path]) -> None:
-        """ 初始化
-        :param tplname: 模版名称，不含扩展名
-        :param dstname: 目测名称
-        """
-        self.name = name
-        self.tplname = tplname
-        self.tplfile = tplname + '.jinja2'
-        self.tpltarget = tpltarget
-        self.replaceobj = replaceobj
-        self.basedir = basedir
-
-    def create_from_jinja(self):
-        """
-        调用 jinja2 直接渲染
-        """
-        from jinja2 import Environment, FileSystemLoader
-        tplenv = Environment(loader=FileSystemLoader(self.basedir))
-        tpl = tplenv.get_template(self.tplfile)
-        with open(self.tpltarget, 'w') as f:
-            f.write(tpl.render(self.replaceobj))
-
-    def write_config_file(self):
-        # create_from_jinja 仅接受字符串
-        if isinstance(self.tpltarget, Path):
-            tpltarget = str(self.tpltarget.resolve())
-        with open(self.tpltarget, 'w') as f:
-            if self.tplname.endswith('_json'):
-                json.dump(self.replaceobj, f, ensure_ascii=False, indent='  ')
-            else:
-                self.create_from_jinja()
-
-
 class Deploy(object):
     env_name: str = None
     pyape_conf: dict = None
     envs: dict = None
-    basedir: Path = None
+    work_dir: Path = None
     conn: Connection = None
-    deploy_dir: Path = None
     pye: str = None
+    replacer: ConfigReplacer = None
 
-    def __init__(self, env_name, pyape_conf, conn, basedir: Path=None):
+    def __init__(self, env_name, pyape_conf, conn, work_dir: Path=None):
         """ 初始化
         """
         self.env_name = env_name
         self.pyape_conf = pyape_conf
         self.envs = pyape_conf['ENV']
         self.conn = conn
-        self.basedir = Path(basedir)
+        self.work_dir = Path(work_dir)
         self.pye = pyape_conf['pye']
+        self.replacer = ConfigReplacer(env_name, pyape_conf, self.work_dir)
 
-        self.check_env_name()
-        self.deploy_dir = Path(self.replace_value(pyape_conf['deploy_dir']))
+        try:
+            self.replacer.check_env_name()
+        except Exception as e:
+            raise Exit(e)
 
     def check_remote_conn(self):
         """ 确保当前提供的 conn 是远程版本
@@ -181,29 +125,8 @@ class Deploy(object):
         if not isinstance(self.conn, Connection):
             raise Exit('Use -H to provide a host!')
 
-    def get_remote_path(self, *args):
-        deploy_dir = self.get_env_value('deploy_dir')
-        if deploy_dir is None:
-            raise Exit('配置中必须包含 deploy_dir！')
-        deploy_path = Path(deploy_dir)
-        # logger.info('get_remote_path deploy_path: %s, deploy_root_dir: %s', deploy_path, self.deploy_root_dir)
-        if deploy_path.is_absolute():
-            return str(deploy_path.joinpath(*args).resolve())
-        return str(self.deploy_dir.joinpath(deploy_path, *args))
-
-    def check_env_name(self):
-        if self.env_name is None:
-            raise Exit('请使用 --env 参数指定一个环境名称！')
-        keys = self.envs.keys()
-        if not self.env_name in self.envs: 
-            raise Exit('--env 参数值范围： \n\n%s' % '\n'.join(keys))
-
-    def get_env_value(self, key=None, default_value=None):
-        self.check_env_name()
-        value = self.envs.get(self.env_name)
-        if value and key is not None:
-            return value.get(key, default_value)
-        return value
+    def get_remote_path(self, *args) -> str:
+        return self.replacer.deploy_dir.joinpath(*args).as_posix()
 
     def remote_exists(self, file):
         """ 是否存在远程文件 file
@@ -211,7 +134,7 @@ class Deploy(object):
         self.check_remote_conn()
         # files.exists 仅接受字符串
         if isinstance(file, Path):
-            file = str(file.resolve())
+            file = file.resolve().as_posix()
         return files.exists(self.conn, file)
 
     def make_remote_dir(self, *args):
@@ -263,7 +186,7 @@ class Deploy(object):
         """ 创建远程服务器的运行环境
         """
         deploy_dir_path = Path(deploy_dir)
-        for d in [ self.deploy_dir,
+        for d in [ self.replacer.deploy_dir,
             deploy_dir,
             deploy_dir_path.joinpath('logs'),
             deploy_dir_path.joinpath('output') ]:
@@ -315,110 +238,48 @@ class Deploy(object):
             if mod_names:
                 self.conn.run('pip install -U ' + ' '.join(mod_names))
 
-    def _get_replaceobj(self, baseobj, tplname, wrapkey=None):
-        replobj = baseobj.copy()
-        updateobj = self.get_env_value(tplname)
-        if updateobj is not None:
-            replobj = merge(replobj, updateobj)
-        return {wrapkey: replobj} if wrapkey else replobj
-
-    def _put_tpl_remote(self, cb, tpltarget_remote, force):
-        self.make_remote_dir()
-        # 删除远程文件
-        tpltarget_remote_exists = self.remote_exists(tpltarget_remote)
-        if force and tpltarget_remote_exists:
-            logger.warning('delete %s', tpltarget_remote)
-            remoter = self.conn.run('rm -f ' + tpltarget_remote)
-            if remoter.ok:
-                logger.warning('删除远程配置文件 %s', tpltarget_remote)
-            tpltarget_remote_exists = False
-        
-        # 本地创建临时文件后上传
-        if force or not tpltarget_remote_exists:
-            cb.write_config_file()
-            self.conn.put(cb.tpltarget, tpltarget_remote)
-            logger.warning('覆盖远程配置文件 %s', tpltarget_remote)
-            localrunner = runners.Local(self.conn)
-            # 删除本地的临时配置文件
-            localr = localrunner.run('rm -f ' + cb.tpltarget)
-            if localr.ok:
-                logger.warning('删除本地临时文件 %s', cb.tpltarget)
-
-    def _replace_environ_values(self, obj, key, value) -> None:
-        """ 执行具体的替换操作，支持递归
+    def put_tpl(self, tpl_name, force=False, local=False):
+        """ 基于 jinja2 模板生成配置文件，根据 env 的值决定是否上传
         """
-        if isinstance(value, dict):
-            for k, v in value.items():
-                self._replace_environ_values(obj[key], k, v)
-        else:
-            environ_key = value.format(self.env_name.upper())
-            environ_value = os.environ.get(environ_key)
-            obj[key] = environ_value
-            logger.info(f'替换 {key} 环境变量：{environ_key}， 值：{environ_value}')
-
-    def _replace_values_from_environ(self, tplname, replaceobj: dict) -> None:
-        """ 从环境变量中替换值
-        例如，指定配置
-
-        env_prod: {
-            'config_json_value_environ_replacer': {
-                'FLASK': {
-                    'SQLALCHEMY_DATABASE_URI': 'AID_{}_SQLALCHEMY_DATABASE_URI',
-                    'SECRET_KEY': 'AID_{}_SECRET_KEY',
-                }
-            }
-        }
-        
-        在生成 prod 的配置文件时，会自动在环境变量中寻找 AID_PROD_SECRET_KEY 来替换 SECRET_KEY 的值
-        """
-        # 找到配置中是否有相应的配置
-        replacer_name = f'{tplname}_value_environ_replacer'
-        value_environ_replacer = self.get_env_value(replacer_name)
-
-        if value_environ_replacer is None:
-            return
-        logger.info(f'找到了 {replacer_name}： {value_environ_replacer}')
-        for k, v in value_environ_replacer.items():
-            self._replace_environ_values(replaceobj, k, v)
-
-    def put_tpl(self, tplname, dstname=None, wrapkey=None, force=False, local=False):
-        """ 基于 jinja2 模板生成配置文件
-        :param wrapkey: 嵌套 dict 的键名。若提供，则将获取到的 replace 对象嵌套进入一个 dict  中，以 wrapkey 为键名
-        :param dstname: 若提供，则使用 dstname 作为目标文件名，不提供则使用 tplname
-        """
-        # TODO
-        baseobj = None
-        if dstname is None:
-            dstname = tplname
-        replaceobj = self._get_replaceobj(baseobj, tplname, wrapkey)
-        self._replace_values_from_environ(tplname, replaceobj)
-
         if self.env_name.startswith('local') or local:
-            tpltarget = self.basedir.joinpath(dstname)
-            logger.warning('tpltarget %s', tpltarget)
-            if force or not tpltarget.exists():
-                cb = ConfigBuilder(self.env_name, tplname, str(tpltarget.resolve()), replaceobj, self.basedir)
-                cb.write_config_file()
-                logger.warning('覆盖本地配置文件 %s', tpltarget)
+            self.replacer.set_writer(tpl_name, force=force)
         else:
-            # 需要创建一个临时文件用于上传
-            tpltarget_local = str(self.basedir.joinpath(tplname + '.temp').resolve())
-            cb = ConfigBuilder(self.env_name, tplname, tpltarget_local, replaceobj, self.basedir)
-            self._put_tpl_remote(cb, self.get_remote_path(dstname), force)
+            # 创建远程文件夹
+            self.make_remote_dir()
+            # 获取远程文件的绝对路径
+            target_remote = self.get_remote_path(tpl_name)
+            tpltarget_remote_exists = self.remote_exists(target_remote)
+            if force and tpltarget_remote_exists:
+                logger.warning('delete %s', target_remote)
+                remoter = self.conn.run(f'rm -f {target_remote}')
+                if remoter.ok:
+                    logger.warning(f'删除远程配置文件 {target_remote}')
+                tpltarget_remote_exists = False
+            
+            # 本地创建临时文件后上传
+            if force or not tpltarget_remote_exists:
+                # 创建一个临时文件用于上传，使用后缀
+                _, final_file = self.replacer.set_writer(tpl_name, force=force, target_postfix=f'.{self.env_name}')
+                self.conn.put(final_file, target_remote)
+                logger.warning('覆盖远程配置文件 %s', target_remote)
+                localrunner = runners.Local(self.conn)
+                # 删除本地的临时配置文件
+                localr = localrunner.run(f'rm -f {final_file.as_posix()}')
+                if localr.ok:
+                    logger.warning(f'删除本地临时文件 {final_file.as_posix()}')
             
     def put_config(self, force: bool=False, local: bool=False) -> None:
-        self.put_tpl('config.toml', dstname='config.toml', force=force, local=local)
-        self.put_tpl('.env', dstname='.env', wrapkey='options', force=force, local=local)
-        self.put_tpl('gunicorn.conf.py', dstname='gunicorn.conf.py', force=force, local=local)
+        for tpl_name in MAIN_CONFIG_FILES:
+            self.put_tpl(tpl_name, force, local)
 
     def rsync(self, exclude=[], is_windows=False):
         """ 部署最新程序到远程服务器
         """
         if is_windows:
             # 因为 windows 下面的 rsync 不支持 windows 风格的绝对路径，转换成相对路径
-            pdir = str(self.basedir.relative_to('.').resolve())
+            pdir = str(self.work_dir.relative_to('.').resolve())
         else:
-            pdir = str(self.basedir.resolve())
+            pdir = str(self.work_dir.resolve())
         if not pdir.endswith('/'):
             pdir += '/'
         deploy_dir = self.get_remote_path()
@@ -437,7 +298,7 @@ class Deploy(object):
                 logger.warning('找不到远程 log 文件 %s', logf)
                 continue
             logp = Path(logf)
-            local_file = self.basedir.joinpath('logs', '{name}_{basename}_{times}{extname}'.format(name=self.env_name, times=time_string, basename=logp.name, extname=logp.suffix))
+            local_file = self.work_dir.joinpath('logs', '{name}_{basename}_{times}{extname}'.format(name=self.env_name, times=time_string, basename=logp.name, extname=logp.suffix))
             self.conn.get(logf, local=local_file)
 
 

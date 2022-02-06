@@ -35,9 +35,7 @@ from pathlib import Path
 from invoke import task
 from invoke.exceptions import Exit
 
-from pyape.cli.fabric import logger, GunicornDeploy as Deploy
-
-from fabconfig import rsync_exclude, config_json, _env, gunicorn_conf_py, enviroments
+from pyape.builder.fabric import logger, GunicornDeploy as Deploy
 
 
 basedir = Path(__file__).parent

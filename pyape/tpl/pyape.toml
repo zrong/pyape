@@ -98,9 +98,12 @@ socket = '%d%n.sock'
 # Stat Server
 stats = '%d%nstats.sock'
 
+['config.toml']
+# 用于信任的 MJST TOKEN，处于这个列表中的 MJST 不会因为过期被拒绝。
+TRUSTED_TOKENS = []
 
 # flask 框架的配置
-[FLASK]
+['config.toml'.FLASK]
 # 用于 FLASK 内部加密
 SECRET_KEY = '{SECRET_KEY}'
 
@@ -110,12 +113,12 @@ SQLALCHEMY_DATABASE_URI = 'sqlite:///{PYAPE_WORKDIR}/pyape.sqlite'
 # REDIS 地址，多 REDIS 配置参见 [FLASK.REDIS_BINDS]
 # REDIS_URI = 'redis://localhost:6379/0'
 
-[FLASK.SQLALCHEMY_BINDS]
+['config.toml'.FLASK.SQLALCHEMY_BINDS]
 # SQLALCHEMY 使用 bind_key_db
 # test1000 = 'mysql+pymysql://test:123456@127.0.0.1/test1000'
 # test2000 = 'mysql+pymysql://test:123456@127.0.0.1/test2000'
 
-[FLASK.REDIS_BINDS]
+['config.toml'.FLASK.REDIS_BINDS]
 # REDIS 使用 bind_key_redis，REDIS_URI 的 bind_key_redis 为 None
 # 对 REDIS 的使用遵循了最大利用率+最大灵活性原则，可能出现：
 # 1. 单个 Regional 使用单个 REDIS 实例（少量情况）
@@ -125,8 +128,6 @@ SQLALCHEMY_DATABASE_URI = 'sqlite:///{PYAPE_WORKDIR}/pyape.sqlite'
 # db0 = 'redis://localhost:6379/0'
 # db1 = 'redis://localhost:6379/1'
 
-# 用于信任的 MJST TOKEN，处于这个列表中的 MJST 不会因为过期被拒绝。
-PYAPE.TRUSTED_TOKENS = []
 
 # 配置系统使用的根帐号和密码
 # [PYAPE.ADMIN]
@@ -134,16 +135,16 @@ PYAPE.TRUSTED_TOKENS = []
 # password = '{ADMIN_PASSWORD}'
 
 # pyzog 是远程 logger 接收器： https://github.com/zrong/pyzog
-[PYAPE.LOGGER.pyzog]
+['config.toml'.LOGGER.pyzog]
 # 若不配置使用 pyzog，将这个表留空
 # type = 'redis/zmq'
 # target = 'redis://:123456@127.0.0.1:6379/0'
 
-[PYAPE.PATH]
+['config.toml'.PATH]
 STATIC_URL_PATH = '/pyapeapi'
 #STATIC_FOLDER = 'dist'
 
-[PYAPE.PATH.modules]
+['config.toml'.PATH.modules]
 cf = '/pyapeapi/cf'
 
 #==============================================
@@ -168,16 +169,16 @@ daemonize = false
 STATIC_URL_PATH = '/static'
 STATIC_FOLDER = 'dist'
 
-[ENV.local.PYAPE.PATH.modules]
+[ENV.local.'config.toml'.PATH.modules]
 cf = '/cf'
 
-[[ENV.local.PYAPE.REGIONALS]]
+[[ENV.local.'config.toml'.REGIONALS]]
 name = '测试服1000'
 index = 1
 # 服务端依赖其作为校验，与 regional 的值相同
 r = 1000
 
-[[ENV.local.PYAPE.REGIONALS]]
+[[ENV.local.'config.toml'.REGIONALS]]
 name = '测试服2000'
 index = 2
 # 服务端依赖其作为校验，与 regional 的值相同

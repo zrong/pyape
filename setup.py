@@ -40,7 +40,7 @@ classifiers = [
 # 使用 flask 的扩展
 entry_points = {
     'console_scripts': [
-        'pyape=pyape.cli.command:main',
+        'pyape=pyape.builder.command:main',
     ]
 }
 
