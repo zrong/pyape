@@ -81,20 +81,19 @@ def copytplfile(srcdir, dstdir, keyname, filename, force=False, rename=False):
         click.echo('复制 {0} 到 {1}'.format(srcfile, dstfile))
 
 
-@click.group(help='初始化 pyape 项目')
+@click.group(help='管理和部署使用 pyape 构建的项目。')
 def main():
     pass
 
 
-@click.command(help='复制 pyape 配置文件到当前项目中')
-@click.option('--all', '-A', default=False, is_flag=True, help='复制所有模版')
+@click.command(help='「本地」复制 pyape 配置文件到当前项目中')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹，也就是复制目标文件夹。')
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
 @click.option('--rename', '-R', default=False, is_flag=True, help='若目标文件存在则重命名')
 @click.argument('name', nargs=-1)
-def copy(all, name, cwd, force, rename):
+def copy(name, cwd, force, rename):
     cwd = Path(cwd)
-    if all:
+    if len(name) == 0:
         for key, tplfile in MAIN_PROJECT_FILES.items():
             copytplfile(pyape_tpl_dir, cwd, key, tplfile, force, rename)
     else:
@@ -106,7 +105,7 @@ def copy(all, name, cwd, force, rename):
             copytplfile(pyape_tpl_dir, cwd, key, MAIN_PROJECT_FILES[key], force, rename)
 
 
-@click.command(help='初始化 pyape 项目')
+@click.command(help='「本地」初始化 pyape 项目')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
 def init(cwd, force):
@@ -114,7 +113,7 @@ def init(cwd, force):
         copytplfile(pyape_tpl_dir, Path(cwd), keyname, filename, force, False)
 
 
-@click.command(help='展示 uwsgi 的运行情况。')
+@click.command(help='「远程」展示 uwsgi 的运行情况。')
 @click.option('--frequency', '-F', default=1, type=int, help='Refresh frequency in seconds')
 @click.argument('address', nargs=1)
 def top(address, frequency):
@@ -122,7 +121,7 @@ def top(address, frequency):
     pyape.uwsgitop.call(address, frequency)
 
 
-@click.command(help='生成配置文件。')
+@click.command(help='「本地」生成配置文件。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--env_postfix', '-P', is_flag=True, help='在生成的配置文件名称末尾加上环境名称后缀。')
@@ -137,7 +136,7 @@ def config(ctx: click.Context, env: str, cwd: str, env_postfix: bool, files: tup
         
 
 
-@click.command(help='生成 Supervisor 需要的配置文件。')
+@click.command(help='「本地」生成 Supervisor 需要的配置文件。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
@@ -156,7 +155,7 @@ def _build_conn(env_name: str, pyape_conf: dict, cwd: Path) -> Connection:
     return Connection(**fabric_conf)
 
 
-@click.command(help='生成并上传配置文件到远程服务器。')
+@click.command(help='「远程」生成并上传配置文件到远程服务器。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--force', '-F', is_flag=True, help='是否强制覆盖已有的配置文件。')
@@ -170,7 +169,7 @@ def putconf(ctx, cwd, env, force):
     d.put_config(force=force)
 
 
-@click.command(help='部署远程服务器的虚拟环境。')
+@click.command(help='「远程」部署远程服务器的虚拟环境。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--init', '-I', is_flag=True, help='是否初始化虚拟环境。')
@@ -190,7 +189,7 @@ def venv(ctx, cwd, env, init: bool, upgrade: tuple):
         d.pipupgrade(all=True)
 
 
-@click.command(help='部署项目到远程服务器。')
+@click.command(help='「远程」部署项目到远程服务器。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
@@ -204,7 +203,7 @@ def deploy(ctx, cwd, env):
     d.put_config(force=True)
 
 
-@click.command(help='在服务器上启动项目进程。')
+@click.command(help='「远程」在服务器上启动项目进程。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
@@ -217,7 +216,7 @@ def start(ctx, cwd, env):
     d.start()
 
 
-@click.command(help='在服务器上停止项目进程。')
+@click.command(help='「远程」在服务器上停止项目进程。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
@@ -230,7 +229,7 @@ def stop(ctx, cwd, env):
     d.stop()
 
 
-@click.command(help='在服务器上重载项目进程。')
+@click.command(help='「远程」在服务器上重载项目进程。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
@@ -243,7 +242,7 @@ def reload(ctx, cwd, env):
     d.reload()
 
 
-@click.command(help='打印所有的过期的 python package。')
+@click.command(help='「远程」打印所有的过期的 python package。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
@@ -261,8 +260,9 @@ main.add_command(init)
 main.add_command(top)
 main.add_command(supervisor)
 main.add_command(config)
-main.add_command(deploy)
 main.add_command(putconf)
+main.add_command(venv)
+main.add_command(deploy)
 main.add_command(start)
 main.add_command(stop)
 main.add_command(reload)

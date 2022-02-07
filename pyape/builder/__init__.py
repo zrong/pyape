@@ -13,6 +13,7 @@ import toml
 # 找到 tpl 文件夹所在地
 # tpl_dir = module_dir.joinpath('tpl')
 
+# 使用 pyape copy 复制所有文件
 MAIN_PROJECT_FILES = {
     'wsgi': 'wsgi.py',
     'readme': 'README.md',
