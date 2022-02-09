@@ -18,6 +18,8 @@
 # {ADMIN_PASSWORD} 管理员密码
 # {SECRET_KEY} flask 框架加密帅扫
 # {SQLALCHEMY_DATABASE_URI} sqlalchemy 定义数据访问
+#
+# 亦可自行增加环境变量，保证配置文件中的变量名称相同即可
 #==============================================
 
 # pyape 项目的名称
@@ -112,18 +114,19 @@ TRUSTED_TOKENS = []
 # 用于 FLASK 内部加密
 SECRET_KEY = '{SECRET_KEY}'
 
-# 数据库地址，多数据库配置参见 [FLASK.SQLALCHEMY_BINDS] {workdir} 被替换为 pyape 运行文件夹的绝对路径
-SQLALCHEMY_DATABASE_URI = 'sqlite:///{PYAPE_WORKDIR}/pyape.sqlite'
+# 单数据库地址配置， {WORK_DIR} 被替换为 pyape 运行文件夹的绝对路径
+SQLALCHEMY_DATABASE_URI = 'sqlite:///{WORK_DIR}/pyape.sqlite'
 
-# REDIS 地址，多 REDIS 配置参见 [FLASK.REDIS_BINDS]
-# REDIS_URI = 'redis://localhost:6379/0'
-
-['config.toml'.FLASK.SQLALCHEMY_BINDS]
-# SQLALCHEMY 使用 bind_key_db
+# 多数据库配置，与单个数据库地址配置方式二选一
+# ['config.toml'.FLASK.SQLALCHEMY_DATABASE_URI]
 # test1000 = 'mysql+pymysql://test:123456@127.0.0.1/test1000'
 # test2000 = 'mysql+pymysql://test:123456@127.0.0.1/test2000'
 
-['config.toml'.FLASK.REDIS_BINDS]
+# 单个 REDIS 地址
+# REDIS_URI = 'redis://localhost:6379/0'
+
+# 多 REDIS 配置，与单个 REDIS 地址配置方式二选一
+# ['config.toml'.FLASK.REDIS_URI]
 # REDIS 使用 bind_key_redis，REDIS_URI 的 bind_key_redis 为 None
 # 对 REDIS 的使用遵循了最大利用率+最大灵活性原则，可能出现：
 # 1. 单个 Regional 使用单个 REDIS 实例（少量情况）
@@ -135,7 +138,7 @@ SQLALCHEMY_DATABASE_URI = 'sqlite:///{PYAPE_WORKDIR}/pyape.sqlite'
 
 
 # 配置系统使用的根帐号和密码
-# [PYAPE.ADMIN]
+# ['config.toml'.ADMIN]
 # name = '{ADMIN_NAME}'
 # password = '{ADMIN_PASSWORD}'
 
@@ -170,7 +173,7 @@ FLASK_RUN_PORT = 5001
 socket = '127.0.0.1:5000'
 daemonize = false
 
-[ENV.local.PYAPE.PATH]
+[ENV.local.'config.toml'.PATH]
 STATIC_URL_PATH = '/static'
 STATIC_FOLDER = 'dist'
 
@@ -191,7 +194,8 @@ r = 2000
 
 
 #--------------------- prod 环境的配置
-# 不要携程 EVN.prod.deploy_dir = .... 解析器的 bug 会导致这种写法增加到 [[ENV.local.PYAPE.REGIONALS]] 内部
+# 不要写成 ENV.prod.deploy_dir = .... 
+# 解析器的 bug 会导致将 ENV.prod.deploy_dir 增加到 [[ENV.local.'config.toml'.REGIONALS]] 内部
 [ENV.prod]
 deploy_dir = '/srv/app/{NAME}_prod'
 

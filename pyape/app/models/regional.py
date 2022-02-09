@@ -6,10 +6,9 @@ Regional 表
 """
 import time
 import toml
-from sqlalchemy.sql.expression import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from pyape.app import gdb, logger
+from pyape.app import gdb
 from pyape.app.queryfun import commit_and_response_error
 from pyape.config import RegionalConfig
 from pyape.util.func import parse_int

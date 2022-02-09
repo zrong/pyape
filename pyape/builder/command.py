@@ -26,12 +26,15 @@ def check_pyape_toml(cwd: str, ctx: click.Context) -> dict:
     return cwd, pyape_conf
 
 
-def write_config_file(env_name: str, pyape_conf: dict, tpl_name: str, work_dir: Path, tpl_dir: Path=None, target_postfix: str='') -> None:
+def write_config_file(ctx: click.Context, env_name: str, pyape_conf: dict, tpl_name: str, work_dir: Path, tpl_dir: Path=None, target_postfix: str='', force: bool=True) -> None:
     """ 写入配置文件
     :param target_postfix: 配置文件的后缀
     """
-    replacer = ConfigReplacer(env_name, pyape_conf, work_dir=work_dir, tpl_dir=tpl_dir)
-    replacer.set_writer(tpl_name, target_postfix)
+    try:
+        replacer = ConfigReplacer(env_name, pyape_conf, work_dir=work_dir, tpl_dir=tpl_dir)
+        replacer.set_writer(tpl_name, force, target_postfix)
+    except Exception as e:
+        ctx.fail(e)
 
 
 
@@ -125,25 +128,27 @@ def top(address, frequency):
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--env_postfix', '-P', is_flag=True, help='在生成的配置文件名称末尾加上环境名称后缀。')
+@click.option('--force', '-F', is_flag=True, help='是否强制替换已存在的文件。')
 @click.argument('files', nargs=-1, type=click.Choice(MAIN_CONFIG_FILES))
 @click.pass_context
-def config(ctx: click.Context, env: str, cwd: str, env_postfix: bool, files: tuple):
+def config(ctx: click.Context, env: str, cwd: str, env_postfix: bool, force:bool, files: tuple):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     # 若没有提供参数就生成所有的配置文件
     config_files = files if len(files) > 0 else MAIN_CONFIG_FILES
     for tpl_name in config_files:
-        write_config_file(env, pyape_conf, tpl_name, work_dir=cwd, target_postfix=f'.{env}' if env_postfix else '')
+        write_config_file(ctx, env, pyape_conf, tpl_name, work_dir=cwd, target_postfix=f'.{env}' if env_postfix else '', force=force)
         
 
 
 @click.command(help='「本地」生成 Supervisor 需要的配置文件。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.option('--force', '-F', is_flag=True, help='是否强制替换已存在的文件。')
 @click.pass_context
-def supervisor(ctx, cwd, env):
+def supervisor(ctx, cwd, env, force):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     for tpl_name in SUPERVISOR_TPL_FILES:
-        write_config_file(env, pyape_conf, tpl_name, work_dir=cwd)
+        write_config_file(ctx, env, pyape_conf, tpl_name, work_dir=cwd, force=force)
 
 
 #---------------------------- 远程部署相关

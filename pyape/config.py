@@ -8,6 +8,8 @@ pyape.config
 
 from pathlib import Path
 import json
+from typing import Any, Union
+import toml
 
 
 # 根据平台中的配置字符串，确定属于哪个平台
@@ -123,16 +125,16 @@ class RegionalConfig(object):
 
 class GlobalConfig(object):
     # 全局变量，用于保存 config.json 载入的配置
-    cfg_json = None
+    cfg_data = None
     regional = None
 
-    def __init__(self, basedir=None, cfg_json='config.json'):
-        self.__basedir = basedir
-        if cfg_json == 'config.json':
-            self.cfg_json = self.readjson(cfg_json, throw_error=True)
+    def __init__(self, work_dir=None, cfg_file='config.toml'):
+        self.__work_dir = work_dir
+        if cfg_file:
+            self.cfg_data = self.read(cfg_file, throw_error=True)
         # self.cfg_json 可能是个 {}
-        if self.cfg_json:
-            self.init_regionals(data=self.cfg_json)
+        if self.cfg_data:
+            self.init_regionals(data=self.cfg_data)
 
     @property
     def regional_list(self):
@@ -152,42 +154,49 @@ class GlobalConfig(object):
             return None
         return self.regional.rids
 
-    def readjson(self, filename, basedir=None, throw_error=False):
-        """ 读取一个 json 格式的配置文件
+    def read(self, filename: str, work_dir: Path=None, throw_error: bool=False) -> Union[list, dict]:
+        """ 读取一个配置文件，支持 .json 和 .toml 扩展名。
 
         :param filename: 文件名
-        :param basedir: str
+        :param work_dir: str
         :param throw_error: boolean 若值为 True，则当文件不存在的时候抛出异常
         :returns: 解析后的 dict
         :rtype: dict
         """
-        jsonf = self.getdir(filename, basedir=basedir)
-        if jsonf.exists():
-            return json.loads(jsonf.read_text(encoding='utf-8'))
+        conf_file = self.getdir(filename, work_dir=work_dir)
+        if conf_file.exists():
+            if filename.endswith('.toml'):
+                return toml.load(conf_file)
+            elif filename.endswith('.json'):
+                return json.load(conf_file)
+            elif throw_error:
+                raise ValueError(f'{conf_file.as_posix()} is not supported!')
         if throw_error:
-            raise FileNotFoundError('%s is not found!' % jsonf.resolve())
+            raise FileNotFoundError(f'{conf_file.as_posix()} is not found!')
         return {}
 
-    def writejson(self, filename, data_dict, basedir=None):
-        """ 将一个 dict 写入成为 json 文件
+    def write(self, filename: str, data_dict: Union[list, dict], work_dir: Path=None) -> None:
+        """ 将一个 dict 写入成为配置文件，支持 .toml 和 .json 后缀。
 
         :param data_dict: 要写入的配置信息
-        :type data_dict: dict
         """
-        jsonf = self.getdir(filename, basedir=basedir)
-        jsonf.write_text(json.dumps(data_dict, ensure_ascii=False, indent=2))
+        conf_file = self.getdir(filename, work_dir=work_dir)
+        if filename.endswith('.toml'):
+            toml.dump(data_dict, conf_file)
+        elif filename.endswith('.json'):
+            json.dump(data_dict, conf_file,  ensure_ascii=False, indent=2)
             
-    def getdir(self, *args, basedir=None) -> Path:
+    def getdir(self, *args, work_dir: Path=None) -> Path:
         """ 基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
         如果传递 basedir，就基于这个 basedir 创建路径
         """
-        if basedir is not None:
-            return Path(basedir, *args)
-        if self.__basedir is None:
-            raise ValueError('please set basedir first!')
-        return Path(self.__basedir, *args)
+        if work_dir is not None:
+            return Path(work_dir, *args)
+        if self.__work_dir is None:
+            raise ValueError('please set work_dir first!')
+        return Path(self.__work_dir, *args)
 
-    def getcfg(self, *args, default_value=None, data='cfg_json'):
+    def getcfg(self, *args, default_value: Any=None, data: Union[str, dict]='cfg_file') -> Any:
         """
         递归获取 dict 中的值
         如果不提供 data，默认使用 cfg 中的值
@@ -198,15 +207,15 @@ class GlobalConfig(object):
         """
         if data is None:
             return None
-        elif data == 'cfg_json':
-            data = self.cfg_json
+        elif data == 'cfg_file':
+            data = self.cfg_data
         if args:
             if isinstance(data, dict):
                 return self.getcfg(*args[1:], data=data.get(args[0], default_value), default_value=default_value)
             return data
         return data
 
-    def init_regionals(self, data='cfg_json'):
+    def init_regionals(self, data: Union[str, dict]='cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)
         if isinstance(rlist, list):
             self.regional = RegionalConfig(rlist)
