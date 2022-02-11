@@ -4,7 +4,6 @@
 # created: 2022-02-06
 ###########################################
 
-from asyncore import write
 import os
 import json
 import jinja2

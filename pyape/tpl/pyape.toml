@@ -115,10 +115,10 @@ TRUSTED_TOKENS = []
 SECRET_KEY = '{SECRET_KEY}'
 
 # 单数据库地址配置， {WORK_DIR} 被替换为 pyape 运行文件夹的绝对路径
-SQLALCHEMY_DATABASE_URI = 'sqlite:///{WORK_DIR}/pyape.sqlite'
+SQLALCHEMY_URI = 'sqlite:///{WORK_DIR}/pyape.sqlite'
 
 # 多数据库配置，与单个数据库地址配置方式二选一
-# ['config.toml'.FLASK.SQLALCHEMY_DATABASE_URI]
+# ['config.toml'.FLASK.SQLALCHEMY_URI]
 # test1000 = 'mysql+pymysql://test:123456@127.0.0.1/test1000'
 # test2000 = 'mysql+pymysql://test:123456@127.0.0.1/test2000'
 

@@ -1,39 +1,125 @@
+"""
+pyape.app
+~~~~~~~~~~~~~~~~~~~
+
+处理 app 初始化，与 flask 强相关
+"""
+
 import importlib
+from pathlib import Path
+import sys
 import logging
 from datetime import datetime
-from functools import partial
 from decimal import Decimal
 from functools import wraps
+from typing import Callable
+
+import flask
 
 from sqlalchemy.inspection import inspect
+from sqlalchemy.orm import Session
+from sqlalchemy.schema import MetaData
 from flask_compress import Compress
-from flask_sqlalchemy import SQLAlchemy
 
 from pyape import uwsgiproxy
-from pyape import gconfig, errors
+from pyape import errors
+from pyape.config import GlobalConfig, RegionalConfig
 from pyape.cache import GlobalCache
+from pyape.db import SQLAlchemy
 from pyape.logging import get_logging_handler, get_pyzog_handler
 from pyape.flask_redis import FlaskRedis
 from pyape.flask_extend import PyapeFlask, PyapeResponse, FlaskConfig
 
 
-class PyapeDB(SQLAlchemy):
+gconfig: GlobalConfig = None
+sqlinst: SQLAlchemy = None
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # 保存根据 regional 进行分类的表定义
-        self.__regional_tables = {}
+class PyapeDB:
+    _gconf: GlobalConfig = None
 
-    def build_regional_tables(self, name, build_table_method, rconfig):
+    # 根据 bind_key 动态生成的 table class，存储在这个 dict 中
+    # 位于 pyape.app.models 中的 valueobject 和 regional，
+    # 由于在框架内部，无法在项目建立的时候就知道数据库的数量，需要动态创建 table class
+    # 动态创建的 class 就保存在这个 dict 中
+    __dynamic_table_cls: dict=None
+
+    # 保存根据 regional 进行分类的表定义
+    __regional_table_cls: dict=None
+
+    def __init__(self, gconf: GlobalCache):
+        self.__dynamic_table_cls = {}
+        self.__regional_table_cls = {}
+        self._gconf = gconf
+
+    def Model(self, bind_key: str=None):
+        """ 获取对应的 Model Factory class
+        """
+        return sqlinst.Model(bind_key)
+
+    def session(self, bind_key: str=None) -> Session:
+        """ 获取对应的 session 实例
+        """
+        return self.__sessions[bind_key]
+        
+    def metadata(self, bind_key: str=None) -> MetaData:
+        """ 获取对应 Model 的 metadata 实例
+        """
+        return self.Model(bind_key).metadata
+
+    def create_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
+        """ 创建 table 
+        """
+        sqlinst.create_tables(table_names, bind_key)
+
+    def drop_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
+        """ 移除 table
+        """
+        sqlinst.drop_tables(table_names, bind_key)
+
+    def execute(self, sql, use_session: bool=False, bind_key: str=None):
+        return sqlinst.execute(sql, use_session, bind_key)
+    
+    def sall(self, sql, one_entity: bool=True, bind_key: str=None) -> list:
+        return sqlinst.sall(sql, one_entity, bind_key)
+
+    def sone(self, sql, one_eneity: bool=True, bind_key: str=None) -> list:
+        return sqlinst.sone(sql, one_eneity, bind_key)
+        
+    def __get_dynamic_table_key(self, table_name: str, bind_key: str) -> str:
+        """ 获取一个用于存储动态生成的 table class 的键名
+        键名是采用 bind_key 和 table_name 拼接而成
+        但 bind_key 会有 None 值的情况，将 None 值转换成为空字符串
+        """
+        bind_prefix: str = bind_key or ''
+        return f'{bind_prefix}_{table_name}'
+        
+    def get_dynamic_table(self, table_name: str, bind_key: str=None):
+        """ 获取动态表"""
+        return self.__dynamic_table_cls.get(self.__get_dynamic_table_key(table_name, bind_key))
+
+    def set_dynamic_table(self, build_table_method: Callable, table_name: str, bind_key: str=None):
+        """ 获取动态表
+        :param table: 已经创建好的 table_cls
+        :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class，参见 pyape.app.models.valueobject.make_value_object_table_cls
+        """
+        key_name: str = self.__get_dynamic_table_key(table_name, bind_key)
+        table = self.get_dynamic_table(table_name, bind_key)
+        if table is not None:
+            raise KeyError(key_name)
+        table = build_table_method(table_name, bind_key)
+        self.__dynamic_table_cls[key_name] = table
+        return table
+
+    def build_regional_tables(self, name: str, build_table_method, rconfig: RegionalConfig):
         """ 根据 regionals 的配置创建多个表
         :param name: 表的名称前缀
         :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class
         :param rconfig: RegionalConfig 的实例
         """
-        tables = self.__regional_tables.get(name)
+        tables = self.__regional_table_cls.get(name)
         if tables is None:
             tables = {}
-            self.__regional_tables[name] = tables
+            self.__regional_table_cls[name] = tables
         for regional in rconfig.rlist:
             r = regional.get('r')
 
@@ -43,11 +129,11 @@ class PyapeDB(SQLAlchemy):
 
             # 默认使用键名 bind_key_db，若找不到则使用键名 bind_key。
             bind_key = regional.get('bind_key_db')
-            Cls = build_table_method(name + str(r), bind_key=bind_key)
+            Cls = build_table_method(f'{name}{r}', bind_key=bind_key)
             tables[r] = Cls
         # logger.info('build_regional_tables %s', tables)
 
-    def get_regional_table(self, name, r, build_table_method, rconfig):
+    def get_regional_table(self, name: str, r: int, build_table_method, rconfig: RegionalConfig):
         """ 根据 regionals 和表名称前缀获取一个动态创建的表
         :param name: 表的名称前缀
         :param r: regional
@@ -55,22 +141,23 @@ class PyapeDB(SQLAlchemy):
         """
         if not r in rconfig.rids:
             raise ValueError('get_regional_table: No regional %s' % r)
-        tables = self.__regional_tables.get(name)
+        tables = self.__regional_table_cls.get(name)
         Cls = None
         if isinstance(tables, dict):
             Cls = tables.get(r)
         if Cls is None:
             # 可能存在更新了 regional 之后，没有更新 tables 的情况，这里要更新一次。
             # 每个进程都需要更新，但每次调用可能仅发生在其中一个进程。因此必须在每次调用的时候都检测更新。
-            self.build_regional_tables(name, build_table_method, gconfig)
-            return self.__regional_tables.get(name)
+            self.build_regional_tables(name, build_table_method, self._gconf)
+            return self.__regional_table_cls.get(name)
         # logger.info('get_regional_table %s', Cls)
         return Cls
 
-    def ismodel(self, instance):
-        """ 判断一个实例是否是 gdb.Model 的实例
+    def ismodel(self, instance, bind_key: str=None):
+        """ 判断一个实例是否是 Model 的实例
         """
-        return isinstance(instance, self.Model)
+        Model = sqlinst.Model(bind_key=bind_key)
+        return isinstance(instance, Model)
 
     def result2dict(self, result, keys, replaceobj=None, replaceobj_key_only=False):
         """
@@ -101,7 +188,7 @@ class PyapeDB(SQLAlchemy):
                 rst[newkey] = value
         return rst
 
-    def to_response_data(self, result, replaceobj=None, replaceobj_key_only=False):
+    def to_response_data(self, result, replaceobj=None, replaceobj_key_only=False, bind_key: str=None):
         # zrong 2017-08-31
         """ 把数据库查询出来的 ResultProxy 转换成 dict 或者 list
         仅支持 list 和 dict 类型，且不支持嵌套（dict 中的值不能包含 ResultProxy 对象）
@@ -118,10 +205,10 @@ class PyapeDB(SQLAlchemy):
         if isinstance(result, dict):
             return result
         # 转换 Model 到 dict
-        if self.ismodel(result):
+        if self.ismodel(result, bind_key):
             return self.result2dict(result, inspect(result).mapper.column_attrs.keys(), replaceobj, replaceobj_key_only)
         # zrong 2017-10-11
-        # 若使用 gdb.session.query 的方式查询，返回的结果是 <class 'sqlalchemy.util._collections.result'>
+        # 若使用 session.query 的方式查询，返回的结果是 <class 'sqlalchemy.util._collections.result'>
         # 它是一个动态生成的 tuple 的子类，带有 keys() 方法
         if callable(getattr(result, 'keys', None)):
             return self.result2dict(result, result.keys(), replaceobj, replaceobj_key_only)
@@ -131,16 +218,24 @@ class PyapeDB(SQLAlchemy):
 class PyapeRedis(FlaskRedis):
     """ 增加 根据 Regional 获取 redis client 的封装
     """
+    _gconf: GlobalConfig = None
+    _rconf: RegionalConfig = None
+
+    def __init__(self, app: PyapeFlask=None, strict=True, config_prefix="REDIS", **kwargs):
+        super().__init__(app, strict, config_prefix, **kwargs)
+        self._gconf = app._gconf
+        self._rconf = app._gconf.regional
+
     def get_regional_client(self, r, force=True):
         """ 根据 r 获取到一个 py_redis_client
         :param r: regional
         :param force: 没有 redis 配置会抛出 ValueError 异常。若设置为 False 则返回 None（无异常）
         """
-        if not r in gconfig.regional_ids:
+        if not r in self._rconf.rids:
             if force:
                 raise ValueError('get_redis_client: no regional %s' % r)
             return None
-        robj = gconfig.regional_dict.get(r)
+        robj = self._rconf.rdict.get(r)
         # bind_key_redis 如果没有定义，或者为 None，就会得到默认的 REDIS_URI
         return grc.get_client(robj.get('bind_key_redis'))
 
@@ -149,7 +244,7 @@ class PyapeRedis(FlaskRedis):
         """
         clients = {}
         rc_clients = self.get_clients()
-        for r, robj in gconfig.regional_dict.items():
+        for r, robj in self._rconf.rdict.items():
             # bind_key_redis 如果没有定义，或者为 None，就会得到默认的 REDIS_URI
             bind_key_redis = robj.get('bind_key_redis')
             clients[r] = rc_clients[bind_key_redis]
@@ -170,20 +265,22 @@ gcache: GlobalCache = None
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def init_db(pyape_app):
+def init_db(pyape_app: PyapeFlask):
     """ 初始化 SQLAlchemy
     """
-    sql_uri = pyape_app.config.get('SQLALCHEMY_DATABASE_URI')
+    sql_uri = pyape_app.config.get('SQLALCHEMY_URI')
     if sql_uri is None:
         return
-    global gdb
+    global gdb, sqlinst
+    sqlinst = SQLAlchemy(URI=sql_uri, in_flask=True)
     if gdb is not None:
         raise ValueError('gdb 不能重复定义！')
     # db 初始化的时候带上 app 参数，这样就不必再次 init_app
-    gdb = PyapeDB(app=pyape_app)
+    gdb = PyapeDB(gconf=pyape_app._gconf)
+    pyape_app._gdb = gdb
 
 
-def init_redis(pyape_app):
+def init_redis(pyape_app: PyapeFlask):
     """ 初始化 REDIS ，配置文件中包含 REDIS_URI 才进行初始化
     """
     redis_uri = pyape_app.config.get('REDIS_URI')
@@ -195,7 +292,7 @@ def init_redis(pyape_app):
     grc = PyapeRedis(app=pyape_app)
 
 
-def init_logger(pyape_app):
+def init_logger(pyape_app: PyapeFlask):
     """ 设置 Flask app 和 sqlalchemy 的logger
     """
     flasklogger = pyape_app.logger
@@ -208,13 +305,13 @@ def init_logger(pyape_app):
     if pyape_app.config.get('DEBUG'):
         handler = get_logging_handler('stream', 'text', level)
     else:
-        name = gconfig.getcfg('NAME')
+        name = pyape_app._gconf.getcfg('NAME')
         if name is None:
             logger_name = 'app'
         else:
             logger_name = 'app.%s' % name
         level = logging.INFO
-        handler = get_pyzog_handler(logger_name, gconfig.getcfg(), gconfig.getdir('logs'), level=level)
+        handler = get_pyzog_handler(logger_name, pyape_app._gconf.getcfg(), pyape_app._gconf.getdir('logs'), level=level)
 
     flasklogger.setLevel(level)
     sqlalchemylogger.setLevel(logging.WARNING)
@@ -222,7 +319,7 @@ def init_logger(pyape_app):
         log.addHandler(handler)
 
 
-def init_cache(pyape_app):
+def init_cache(pyape_app: PyapeFlask):
     """ 初始化全局缓存对象
     """
     global gcache
@@ -258,37 +355,37 @@ def register_blueprint(pyape_app, rest_package, rest_package_names):
         pyape_app.register_blueprint(getattr(bp_module, bp_name), url_prefix=url)
 
 
-def _build_kwargs_for_app():
+def _build_kwargs_for_app(gconf: GlobalConfig):
     """ 将本地所有路径转换为绝对路径，以保证其在任何环境下可用
     """
     kwargs = {
-            'static_url_path': gconfig.getcfg('PATH', 'STATIC_URL_PATH', default_value=''),
-            'static_folder': gconfig.getcfg('PATH', 'STATIC_FOLDER', default_value='static'),
-            'template_folder': gconfig.getcfg('PATH', 'TEMPLATE_FOLDER', default_value='templates')
+            'static_url_path': gconf.getcfg('PATH', 'STATIC_URL_PATH', default_value=''),
+            'static_folder': gconf.getcfg('PATH', 'STATIC_FOLDER', default_value='static'),
+            'template_folder': gconf.getcfg('PATH', 'TEMPLATE_FOLDER', default_value='templates')
         }
 
-    instance_path = gconfig.getcfg('PATH', 'INSTANCE_PATH')
+    instance_path = gconf.getcfg('PATH', 'INSTANCE_PATH')
     if instance_path:
-        kwargs['instance_path'] = str(gconfig.getdir(instance_path).resolve())
+        kwargs['instance_path'] = gconf.getdir(instance_path).resolve().as_posix()
     else:
-        kwargs['instance_path'] = str(gconfig.getdir().resolve())
+        kwargs['instance_path'] = gconf.getdir().resolve().as_posix()
 
-    kwargs['template_folder'] = str(gconfig.getdir(kwargs['template_folder']).resolve())
-    kwargs['static_folder'] = str(gconfig.getdir(kwargs['static_folder']).resolve())
+    kwargs['template_folder'] = gconf.getdir(kwargs['template_folder']).resolve().as_posix()
+    kwargs['static_folder'] = gconf.getdir(kwargs['static_folder']).resolve().as_posix()
     return kwargs
 
 
-def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=FlaskConfig):
+def create_app(gconf: GlobalConfig, FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=FlaskConfig):
     """
     根据不同的配置创建 app
     :param config_name:
     :return:
     """
-    kwargs = _build_kwargs_for_app()
+    kwargs = _build_kwargs_for_app(gconf)
 
-    pyape_app = FlaskClass(__name__, **kwargs)
+    pyape_app = FlaskClass(__name__, gconf=gconf, **kwargs)
     pyape_app.response_class = ResponseClass
-    pyape_app.config.from_object(ConfigClass(gconfig.getcfg('FLASK')))
+    pyape_app.config.from_object(ConfigClass(gconf.getcfg('FLASK')))
     if pyape_app.config.get('COMPRESS_ON'):
         # 压缩 gzip
         compress = Compress()
@@ -296,3 +393,74 @@ def create_app(FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=F
     # 处理全局错误
     errors.init_app(pyape_app)
     return pyape_app
+
+
+def _init_common(gconf: GlobalConfig=None, cls_config=None) -> PyapeFlask:
+    if gconf is None:
+        gconf = GlobalConfig(Path.cwd())
+    sys.modules[__name__].__dict__['gconfig'] = gconf
+    sqlinst = SQLAlchemy()
+
+    flask.cli.load_dotenv()
+
+    pyape_app = create_app(gconf ,**cls_config) if isinstance(cls_config, dict) else create_app(gconf)
+
+    init_db(pyape_app)
+    init_redis(pyape_app)
+    # logger 可能会使用 redis，因此顺序在 redis 初始化之后
+    init_logger(pyape_app)
+    # cache 可能会使用 redis，因此顺序在 redis 初始化之后
+    init_cache(pyape_app)
+    
+    return pyape_app
+
+
+def init(gconf: GlobalConfig=None, init_app_method=None, cls_config=None) -> PyapeFlask:
+    """ 初始化 APP
+    :param gconf: pyape.config.GlobalConfig 的实例
+    :param init_app: 外部初始化方法
+    :param cls_config: 一个包含自定义 Class 的 dict
+        形如: {'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}
+        不需要同时包含 3 个 Class
+    """
+    pyape_app = _init_common(gconf, cls_config)
+
+    # 这个方法必须在注册蓝图前调用
+    if init_app_method is not None:
+        init_app_method(pyape_app)
+
+    # blueprint 要 import gdb，因此要在 gdb 之后注册
+    appmodules = gconf.getcfg('PATH', 'modules')
+    register_blueprint(pyape_app, 'app', appmodules)
+    return pyape_app
+
+
+def init_decorator(gconf: GlobalConfig=None, cls_config=None):
+    """ 初始化 APP 的装饰器版本
+    :param gconf: pyape.config.GlobalConfig 的实例
+    :param init_app: 外部初始化方法
+    :param cls_config: 一个包含自定义 Class 的 dict
+        形如: {'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}
+        不需要同时包含 3 个 Class
+    """
+    pyape_app = _init_common(gconf, cls_config)
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_fun(*args, **kwargs):
+            kwargs['pyape_app'] = pyape_app
+            # 在外部调用中需要做：
+            # 1. 导入外部的 models
+            # 2. 创建数据库
+            # 这里不传递 *args 这个参数，因为在 uwsgi 中这个参数有不少来自于服务器的值，
+            # 这会导致 f 调用失败，f 仅接受 pyape_app 这个参数
+            decorated_return = f(**kwargs)
+
+            # blueprint 要 import gdb，因此要在 gdb 之后注册
+            appmodules = gconf.getcfg('PATH', 'modules')
+            register_blueprint(pyape_app, 'app', appmodules)
+            return decorated_return
+
+        return decorated_fun
+
+    return decorator

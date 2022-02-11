@@ -136,24 +136,6 @@ class GlobalConfig(object):
         if self.cfg_data:
             self.init_regionals(data=self.cfg_data)
 
-    @property
-    def regional_list(self):
-        if self.regional is None:
-            return None
-        return self.regional.rlist
-
-    @property
-    def regional_dict(self):
-        if self.regional is None:
-            return None
-        return self.regional.rdict
-
-    @property
-    def regional_ids(self):
-        if self.regional is None:
-            return None
-        return self.regional.rids
-
     def read(self, filename: str, work_dir: Path=None, throw_error: bool=False) -> Union[list, dict]:
         """ 读取一个配置文件，支持 .json 和 .toml 扩展名。
 

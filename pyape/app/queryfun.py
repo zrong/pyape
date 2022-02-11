@@ -34,22 +34,23 @@ def get_total_value(query, sum_field):
     return 0 if total_value_entry.total_value is None else int(total_value_entry.total_value)
 
 
-def commit_and_response_error(inst, refresh=False, delete=False, return_dict=False):
+def commit_and_response_error(inst, refresh=False, delete=False, return_dict=False, bind_key: str=None):
     """ 将提交一个 instance 并返回错误响应，封装成一个操作
     """
     try:
+        session = gdb.session(bind_key)
         if delete:
-            gdb.session.delete(inst)
+            session.delete(inst)
         else:
-            gdb.session.add(inst)
-        gdb.session.commit()
+            session.add(inst)
+        session.commit()
         if refresh:
-            gdb.session.refresh(inst)
+            session.refresh(inst)
         return None
     except Exception as e:
         msg = str(e)
         logger.error(msg)
-        gdb.session.rollback()
+        session.rollback()
         resp_dict = {'error': True, 'message': msg, 'code': 500}
         if return_dict:
             return resp_dict

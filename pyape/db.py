@@ -8,11 +8,10 @@
 # @created 2022-02-07
 #======================
 
-from typing import Union
+from typing import Iterable, Union
 from sqlalchemy.schema import Table, MetaData
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
 from sqlalchemy.engine import Engine, create_engine
-
 
 
 class DBManager(object):
@@ -33,6 +32,14 @@ class DBManager(object):
         self.URI = URI
         self.__set_default_uri()
         self.__build_dbs()
+
+    @property
+    def Models(self) -> Iterable:
+        return self.__model_classes.values()
+        
+    @property
+    def bind_keys(self) -> Iterable:
+        return self.__model_classes.keys()
         
     def __build_dbs(self) -> None:
         view = None
@@ -148,6 +155,18 @@ class SQLAlchemy(object):
             metadata.drop_all(bind=engine, tables=tables, checkfirst=True)
         else:
             metadata.drop_all(bind=engine, checkfirst=True)
+    
+    def create_all(self) -> None:
+        """ 创建所有数据库中的所有表"""
+        for bind_key in self.dbm.bind_keys:
+            metadata = self.metadata(bind_key)
+            metadata.create_all(bind=self.engine(bind_key), checkfirst=True)
+        
+    def drop_all(self) -> None:
+        """ 删除所有数据库中的所有表"""
+        for bind_key in self.dbm.bind_keys:
+            metadata = self.metadata(bind_key)
+            metadata.drop_all(bind=self.engine(bind_key), checkfirst=True)
 
     def get_table(self, name: str, bind_key: str=None) -> Table:
         return self.metadata(bind_key).tables[name]
@@ -169,11 +188,11 @@ class SQLAlchemy(object):
             return [item[0] for item in rows]
         return rows
 
-    def sone(self, sql, one_eneity: bool=True, bind_key: str=None) -> list:
+    def sone(self, sql, one_entity: bool=True, bind_key: str=None) -> list:
         """ 基于 session 获取一条数据
         :param is_entity: 若为实体，则需要取第一项 https://docs.sqlalchemy.org/en/14/tutorial/data_select.html
         """
         row = self.execute(sql, use_session=True, bind_key=bind_key).fetchone()
-        if one_eneity:
+        if one_entity:
             return row[0]
         return row

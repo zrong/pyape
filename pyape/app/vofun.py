@@ -8,7 +8,6 @@ pyape.app.vofun
 import time
 
 from pyape.util.func import parse_int
-from pyape import gconfig
 from pyape.app import gdb, gcache, logger
 from pyape.app.models.valueobject import ValueObject, get_vo_query
 from pyape.app.re2fun import get_request_values, responseto, get_page_response

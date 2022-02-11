@@ -112,9 +112,22 @@ def copy(name, cwd, force, rename):
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
 def init(cwd, force):
+    cwd = Path(cwd)
     for keyname, filename in MAIN_PROJECT_FILES.items():
-        copytplfile(pyape_tpl_dir, Path(cwd), keyname, filename, force, False)
+        copytplfile(pyape_tpl_dir, cwd, keyname, filename, force, False)
 
+@click.command(help='「本地」创建 pyape 项目运行时必须的环境，例如数据库建立等。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.pass_context
+def setup(ctx, cwd):
+    cwd = Path(cwd)
+    for filename in MAIN_PROJECT_FILES.values():
+        if not cwd.joinpath(filename).exists():
+            ctx.fail('Please call "pyape init" to generate project files.')
+    from importlib.util import spec_from_file_location, module_from_spec
+    spec = spec_from_file_location('wsgi.setup', cwd.joinpath('wsgi.py'))
+    mod = module_from_spec(spec)
+    print(mod)
 
 @click.command(help='「远程」展示 uwsgi 的运行情况。')
 @click.option('--frequency', '-F', default=1, type=int, help='Refresh frequency in seconds')
@@ -262,6 +275,7 @@ def pipoutdated(ctx, cwd, env):
 
 main.add_command(copy)
 main.add_command(init)
+main.add_command(setup)
 main.add_command(top)
 main.add_command(supervisor)
 main.add_command(config)

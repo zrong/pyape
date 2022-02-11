@@ -1,6 +1,8 @@
 from werkzeug.datastructures import Headers
 from flask import (Flask, Response, request)
 
+from pyape.config import GlobalConfig
+
 
 class FlaskConfig(object):
     """ flask.config.from_object 不支持 dict，因此建立这个 class
@@ -10,17 +12,13 @@ class FlaskConfig(object):
     LOGGER_HANDLER_POLICY = 'never'
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
-    # 详见 Flask_sqlalchemy: https://flask-sqlalchemy.palletsprojects.com/en/2.x/config/#configuration-keys
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_COMMIT_ON_TEARDOWN = True
-
     def __init__(self, cfgdef=None):
         if cfgdef:
             self.from_object(cfgdef)
         self.check_must_keys()
 
     def check_must_keys(self):
-        for key in ('SECRET_KEY', 'SQLALCHEMY_DATABASE_URI'):
+        for key in ('SECRET_KEY', 'SQLALCHEMY_URI'):
             if getattr(self, key, None) is None:
                 raise ValueError('No ' + key)
 
@@ -72,7 +70,10 @@ class PyapeResponse(Response):
 
 
 class PyapeFlask(Flask):
-    def __init__(self, *args, **kwargs):
+    _gconf: GlobalConfig = None
+    _gdb = None
+    def __init__(self, *args, gconf: GlobalConfig, **kwargs):
+        self._gconf = gconf
         super().__init__(*args, **kwargs)
 
     def log_exception(self, exc_info):

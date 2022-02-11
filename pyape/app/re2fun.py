@@ -12,7 +12,6 @@ from datetime import datetime
 from flask import (request, jsonify, make_response, send_file)
 from flask_sqlalchemy import BaseQuery
 
-from pyape import gconfig
 from pyape.app import gdb, logger
 from pyape.util.func import parse_float, parse_date, daydt
 
@@ -70,7 +69,9 @@ def get_request_values(*args, replaceobj=None, defaultvalue={}, request_key='jso
     return dict(defaultvalue, **dict(rinfo, **rdata))
 
 
-def responseto(message=None, error=None, code=None, data=None, replaceobj=None, replaceobj_key_only=False, return_dict=False, **kwargs):
+def responseto(message: str=None, error: bool=None, code: int=None, data: dict=None,
+    replaceobj: dict=None, replaceobj_key_only: bool=False, return_dict: bool=False,
+    bind_key: str=None, **kwargs):
     """ 封装 json 响应
     :param message: 错误消息，若提供则默认 error 为 True
     :param error: 是否包含错误
@@ -89,7 +90,7 @@ def responseto(message=None, error=None, code=None, data=None, replaceobj=None, 
             # 不处理空对象
             if not v:
                 continue
-            data[k] = gdb.to_response_data(v, replaceobj, replaceobj_key_only)
+            data[k] = gdb.to_response_data(v, replaceobj, replaceobj_key_only, bind_key)
         data['error'] = error
         data['code'] = code
         if message:
