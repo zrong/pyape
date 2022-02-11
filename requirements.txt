@@ -1,6 +1,5 @@
 wheel
 Flask
-Flask-SQLAlchemy
 flask-compress
 PyMySQL
 python-dotenv

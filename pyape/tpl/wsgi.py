@@ -50,12 +50,3 @@ def create_app(pyape_app: PyapeFlask):
 
 # gconfig 可以设置为 None，此时会使用 Path.cwd() 下的 config.toml 作为配置文件。
 pyape_app: PyapeFlask = pyape.app.init(gconfig, create_app, cls_config={'ResponseClass': CustomResponse})
-
-
-def setup():
-    """ 这个方法被 pyape.builder.command 中的 setup 命令调用
-    pyape 的设计，并不严格依赖 flask app 的上下文
-    许多命令不是必须在 flask shell 中执行
-    在这里可以进行更简单直接的初始化
-    """
-    pass

@@ -116,7 +116,7 @@ def init(cwd, force):
     for keyname, filename in MAIN_PROJECT_FILES.items():
         copytplfile(pyape_tpl_dir, cwd, keyname, filename, force, False)
 
-@click.command(help='「本地」创建 pyape 项目运行时必须的环境，例如数据库建立等。')
+@click.command(help='「本地」创建 pyape 项目运行时必须的环境，例如数据库建立等。需要自行在项目根文件夹创建 setup.py。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.pass_context
 def setup(ctx, cwd):
@@ -124,10 +124,13 @@ def setup(ctx, cwd):
     for filename in MAIN_PROJECT_FILES.values():
         if not cwd.joinpath(filename).exists():
             ctx.fail('Please call "pyape init" to generate project files.')
+    setup_py = cwd.joinpath('setup.py')
+    if not cwd.joinpath(setup_py).exists():
+        ctx.fail('Please create a file named "setup.py" in project root directory.')
     from importlib.util import spec_from_file_location, module_from_spec
-    spec = spec_from_file_location('wsgi.setup', cwd.joinpath('wsgi.py'))
+    spec = spec_from_file_location('pyape.setup', setup_py)
     mod = module_from_spec(spec)
-    print(mod)
+    spec.loader.exec_module(mod)
 
 @click.command(help='「远程」展示 uwsgi 的运行情况。')
 @click.option('--frequency', '-F', default=1, type=int, help='Refresh frequency in seconds')
