@@ -268,7 +268,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 def init_db(pyape_app: PyapeFlask):
     """ 初始化 SQLAlchemy
     """
-    sql_uri = pyape_app.config.get('SQLALCHEMY_URI')
+    sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
     if sql_uri is None:
         return
     global gdb, sqlinst
@@ -283,7 +283,7 @@ def init_db(pyape_app: PyapeFlask):
 def init_redis(pyape_app: PyapeFlask):
     """ 初始化 REDIS ，配置文件中包含 REDIS_URI 才进行初始化
     """
-    redis_uri = pyape_app.config.get('REDIS_URI')
+    redis_uri = pyape_app._gconf.getcfg('REDIS', 'URI')
     if redis_uri is None:
         return
     global grc

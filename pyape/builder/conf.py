@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 import toml
-from pyape.builder import REPLACE_ENVIRON
 from pyape.tpl import base_dir as pyape_tpl_dir
 
 
@@ -107,6 +106,7 @@ class ConfigReplacer(object):
     tpl_dir: Path = None
     deploy_dir: Path = None
     pye: str = None
+    replace_environ: list[str] = None
     writer: ConfigWriter = None
 
     def __init__(self, env_name, pyape_conf, work_dir: Path, tpl_dir: Path=None):
@@ -117,10 +117,10 @@ class ConfigReplacer(object):
         self.envs = pyape_conf['ENV']
         self.work_dir = work_dir
         self.tpl_dir = tpl_dir or pyape_tpl_dir
-        self.pye = pyape_conf['pye']
+        self.pye = pyape_conf['PYE']
 
         self.check_env_name()
-        self._set_name_and_deploy_dir()
+        self._set_replace_keys()
 
     def check_env_name(self):
         if self.env_name is None:
@@ -129,16 +129,17 @@ class ConfigReplacer(object):
         if not self.env_name in self.envs: 
             raise ValueError('env must be in follow values: \n\n{}'.format('\n'.join(keys)))
         
-    def _set_name_and_deploy_dir(self):
+    def _set_replace_keys(self):
         """ name 和 deploy_dir 的值允许作为替换值使用，但这两个值中也可能包含替换值，因此需要先固化下来"""
-        self.pyape_name = self.get_tpl_value('name', merge=False)
+        self.pyape_name = self.get_tpl_value('NAME', merge=False)
         # 获取被 env 合并后的值
-        deploy_dir = self.get_tpl_value('deploy_dir', merge=False)
+        deploy_dir = self.get_tpl_value('DEPLOY_DIR', merge=False)
         # 如果包含 {NAME} 或者环境变量的替换值，需要替换
         deploy_dir = self.replace(deploy_dir)
         self.deploy_dir = Path(deploy_dir)
         if not self.deploy_dir.is_absolute():
-            raise ValueError('deploy_dir must be a absolute path!')
+            raise ValueError('DEPLOY_DIR must be a absolute path!')
+        self.replace_environ = self.get_tpl_value('REPLACE_ENVIRON', merge=False)
 
     def get_tpl_value(self, tpl_name: str, merge: bool=True, wrap_key: str=None) -> Any:
         """ 获取配置模版中的值
@@ -165,6 +166,8 @@ class ConfigReplacer(object):
     def replace(self, value: str) -> str:
         """ 替换 value 中的占位符
         """
+        # 环境变量替换用
+        environ_keys = {}
         # 替换 {NAME} 和 {WORK_DIR}
         replace_obj = {
             'NAME': self.pyape_name,
@@ -174,20 +177,23 @@ class ConfigReplacer(object):
         if isinstance(self.deploy_dir, Path):
             replace_obj['DEPLOY_DIR'] = self.deploy_dir.as_posix()
         # 获取环境变量中的替换值
-        environ_keys = {}
-        for n in REPLACE_ENVIRON:
-            # PYAPE_LOCAL_NAME
-            environ_key = f'{self.pyape_name.upper()}_{self.env_name.upper()}_{n}'
-            environ_keys[n] = environ_key
-            environ_value = os.environ.get(environ_key)
-            if environ_value is not None:
-                replace_obj[n] = environ_value
+        if self.replace_environ is not None:
+            for n in self.replace_environ:
+                # PYAPE_LOCAL_NAME
+                environ_key = f'{self.pyape_name.upper()}_{self.env_name.upper()}_{n}'
+                environ_keys[n] = environ_key
+                environ_value = os.environ.get(environ_key)
+                if environ_value is not None:
+                    replace_obj[n] = environ_value
         try:
             new_value = value.format_map(replace_obj)
             return new_value
         except KeyError as e:
             # 抛出对应的 environ key 的错误
-            raise KeyError(environ_keys.get(e.args[0]))
+            error_key = e.args[0]
+            raise ValueError(f'''error_key: {error_key}
+environ_keys: {environ_keys}
+replace_obj: {replace_obj}.''')
 
     def get_env_value(self, key=None, default_value=None):
         value = self.envs.get(self.env_name)

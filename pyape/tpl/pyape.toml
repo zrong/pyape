@@ -6,34 +6,34 @@
 # {NAME} 项目名称，定义在配置文件中
 # {WORK_DIR} 项目源码所在文件夹的绝对路径
 # {DEPLOY_DIR} 部署在服务器上的文件夹
-#
+#==============================================
+
+# pyape 项目的名称
+NAME = 'pyape'
+
+# python 运行时路径，可使用绝对路径
+PYE = 'python3'
+
+# 部署在服务器上的文件夹
+DEPLOY_DIR = '/srv/app/{NAME}'
+
+# 允许被替换的环境变量
 # 以下 {} 变量被环境变量替换
 # 若值中包含下面的键，则会被替换成环境变量中的值
 # 例如：
 # 1. 项目 name 为 pyape（默认值），项目 name 作为环境变量替换时，会被转换为全大写
 # 2. 环境变量中包含 PYAPE_LOCAL_ADMIN_NAME
 # 3. 使用 --env local 生成配置文件时，将替换 {ADMIN_NAME} 的值为环境变量中的 PYAPE_LOCAL_ADMIN_NAME
-# 
 # {ADMIN_NAME} 管理员帐号
 # {ADMIN_PASSWORD} 管理员密码
-# {SECRET_KEY} flask 框架加密帅扫
-# {SQLALCHEMY_DATABASE_URI} sqlalchemy 定义数据访问
+# {SECRET_KEY} flask 框架加密
+# {SQLALCHEMY_URI} 数据库地址和密码
 #
 # 亦可自行增加环境变量，保证配置文件中的变量名称相同即可
-#==============================================
-
-# pyape 项目的名称
-name = 'pyape'
-
-# python 运行时路径，可使用绝对路径
-pye = 'python3'
-
-# 部署在服务器上的文件夹
-deploy_dir = '/srv/app/{NAME}'
-
+REPLACE_ENVIRON = ['ADMIN_NAME', 'ADMIN_PASSWORD', 'SECRET_KEY', 'SQLALCHEMY_URI']
 
 # 用于 deploy 上传时排除本地文件
-rsync_exclude = [
+RSYNC_EXCLUDE = [
     '.DS_Store', '*.pyc', 'fab*', '__pycache__', '.pytest_cache',
     '.vscode', '*.code-workspace', '*.swp', '*.iml', 
     '.git', '.pyenv', 'venv', '.gitignore', 
@@ -43,7 +43,7 @@ rsync_exclude = [
 ]
 
 # 用于 fabric 进行远程部署时候的配置
-['fabric']
+[FABRIC]
 host = 'zengrong-net'
 user = 'app'
 
@@ -114,19 +114,31 @@ TRUSTED_TOKENS = []
 # 用于 FLASK 内部加密
 SECRET_KEY = '{SECRET_KEY}'
 
+['config.toml'.SQLALCHEMY]
 # 单数据库地址配置， {WORK_DIR} 被替换为 pyape 运行文件夹的绝对路径
-SQLALCHEMY_URI = 'sqlite:///{WORK_DIR}/pyape.sqlite'
+URI = 'sqlite:///{WORK_DIR}/pyape.sqlite'
+
+# 单数据库配置数据库引擎参数
+['config.toml'.SQLALCHEMY.ENGINE_OPTIONS]
+pool_timeout = 10
+pool_recycle = 3600
 
 # 多数据库配置，与单个数据库地址配置方式二选一
-# ['config.toml'.FLASK.SQLALCHEMY_URI]
+# ['config.toml'.SQLALCHEMY.URI]
 # test1000 = 'mysql+pymysql://test:123456@127.0.0.1/test1000'
 # test2000 = 'mysql+pymysql://test:123456@127.0.0.1/test2000'
 
+# 多数据库配置数据库引擎参数
+# ['config.toml'.SQLALCHEMY.ENGINE_OPTIONS.test1000]
+# pool_timeout = 10
+# pool_recycle = 3600
+
 # 单个 REDIS 地址
-# REDIS_URI = 'redis://localhost:6379/0'
+# ['config.toml'.REDIS]
+# URI = 'redis://localhost:6379/0'
 
 # 多 REDIS 配置，与单个 REDIS 地址配置方式二选一
-# ['config.toml'.FLASK.REDIS_URI]
+# ['config.toml'.REDIS.URI]
 # REDIS 使用 bind_key_redis，REDIS_URI 的 bind_key_redis 为 None
 # 对 REDIS 的使用遵循了最大利用率+最大灵活性原则，可能出现：
 # 1. 单个 Regional 使用单个 REDIS 实例（少量情况）
@@ -202,5 +214,11 @@ deploy_dir = '/srv/app/{NAME}_prod'
 [ENV.prod.'uwsgi.ini']
 processes = 4
 
-[ENV.prod.FLASK]
-SQLALCHEMY_DATABASE_URI = '{SQLALCHEMY_DATABASE_URI}'
+[ENV.prod.'config.toml'.SQLALCHEMY]
+URI = 'sqlite:///{DEPLOY_DIR}/pyape.sqlite'
+
+[ENV.prod.'gunicory.conf.py']
+bind = 'unix:{DEPLOY_DIR}/gunicorn.sock'
+pidfile = '{DEPLOY_DIR}/gunicorn.pid'
+accesslog = '{DEPLOY_DIR}/logs/access.log'
+errorlog = '{DEPLOY_DIR}/logs/error.log'

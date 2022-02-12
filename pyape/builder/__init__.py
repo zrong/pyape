@@ -23,7 +23,6 @@ MAIN_PROJECT_FILES = {
 
 MAIN_CONFIG_FILES = ['.env', 'uwsgi.ini', 'gunicorn.conf.py', 'config.toml']
 SUPERVISOR_TPL_FILES = ['supervisor_program.conf', 'supervisord.service', 'supervisord.conf']
-REPLACE_ENVIRON = ['ADMIN_NAME', 'ADMIN_PASSWORD', 'SECRET_KEY', 'SQLALCHEMY_DATABASE_URI']
 
 
 def get_pyape_toml_file(cwd: Path=None) -> Path:
@@ -37,10 +36,11 @@ def get_pyape_toml(pyape_toml: Path) -> tuple[bool, dict]:
     err = None
     try:
         pyape_conf = toml.load(pyape_toml)
-        pyape_conf['rsync_exclude']
-        pyape_conf['name']
-        pyape_conf['pye']
-        pyape_conf['deploy_dir']
+        pyape_conf['RSYNC_EXCLUDE']
+        pyape_conf['NAME']
+        pyape_conf['PYE']
+        pyape_conf['DEPLOY_DIR']
+        pyape_conf['REPLACE_ENVIRON']
         return True, pyape_conf
     except FileNotFoundError:
         err = 'Please call "pyape init" to generate a "pyape.toml" file.'

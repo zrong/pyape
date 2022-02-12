@@ -18,7 +18,7 @@ class FlaskConfig(object):
         self.check_must_keys()
 
     def check_must_keys(self):
-        for key in ('SECRET_KEY', 'SQLALCHEMY_URI'):
+        for key in ('SECRET_KEY'):
             if getattr(self, key, None) is None:
                 raise ValueError('No ' + key)
 

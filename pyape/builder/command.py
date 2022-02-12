@@ -89,6 +89,26 @@ def main():
     pass
 
 
+@click.command(help='「本地」生成器，生成一个 Flask 可用的 SECRET_KEY，一个 NONCE 字符串，和一个加盐密码。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹，也就是复制目标文件夹。')
+@click.option('--password', type=click.STRING, help='返回加盐之后的 PASSWORD，需要提供密码，同时在 NAME 参数中提供一个盐值。')
+@click.option('--nonce', show_default=True, type=click.INT, required=False, default=8, help='返回一个 nonce 字符串。')
+@click.argument('name', nargs=-1)
+@click.pass_context
+def gen(ctx, name, cwd, password: str, nonce: int):
+    cwd = Path(cwd)
+    values = {}
+    from pyape.util import gen
+    values['secret-key'] = gen.gen_secret_key()
+    if password:
+        if len(name) < 1:
+            ctx.fail('必须提供盐值！')
+        values['password'] = gen.gen_password(password, name[0])
+    if nonce > 0:
+        values['nonce'] = gen.gen_nonce(k=nonce)
+    click.echo(values)
+
+
 @click.command(help='「本地」复制 pyape 配置文件到当前项目中')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹，也就是复制目标文件夹。')
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
@@ -172,7 +192,7 @@ def supervisor(ctx, cwd, env, force):
 def _build_conn(env_name: str, pyape_conf: dict, cwd: Path) -> Connection:
     replacer = ConfigReplacer(env_name, pyape_conf, cwd)
     # 从 pyape.toml 配置中获取服务器地址
-    fabric_conf = replacer.get_tpl_value('fabric', merge=False)
+    fabric_conf = replacer.get_tpl_value('FABRIC', merge=False)
     return Connection(**fabric_conf)
 
 
@@ -220,7 +240,7 @@ def deploy(ctx, cwd, env):
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
     d = Deploy(env, pyape_conf, conn, cwd)
-    d.rsync(exclude=pyape_conf['rsync_exclude'])
+    d.rsync(exclude=pyape_conf['RSYNC_EXCLUDE'])
     d.put_config(force=True)
 
 
@@ -276,6 +296,7 @@ def pipoutdated(ctx, cwd, env):
     d.pipoutdated()
 
 
+main.add_command(gen)
 main.add_command(copy)
 main.add_command(init)
 main.add_command(setup)

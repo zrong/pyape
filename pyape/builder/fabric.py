@@ -111,7 +111,7 @@ class Deploy(object):
         self.envs = pyape_conf['ENV']
         self.conn = conn
         self.work_dir = Path(work_dir)
-        self.pye = pyape_conf['pye']
+        self.pye = pyape_conf['PYE']
         self.replacer = ConfigReplacer(env_name, pyape_conf, self.work_dir)
 
         try:
