@@ -399,7 +399,7 @@ def _init_common(gconf: GlobalConfig=None, cls_config=None) -> PyapeFlask:
     if gconf is None:
         gconf = GlobalConfig(Path.cwd())
     sys.modules[__name__].__dict__['gconfig'] = gconf
-    sqlinst = SQLAlchemy()
+    sqlinst = SQLAlchemy(URI=gconf.getcfg('FLASK', 'SQLALCHEMY_URI'))
 
     flask.cli.load_dotenv()
 

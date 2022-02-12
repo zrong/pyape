@@ -179,23 +179,37 @@ class GlobalConfig(object):
         return Path(self.__work_dir, *args)
 
     def getcfg(self, *args, default_value: Any=None, data: Union[str, dict]='cfg_file') -> Any:
-        """
-        递归获取 dict 中的值
-        如果不提供 data，默认使用 cfg 中的值
-        注意，getcfg 不仅可用于读取 config.yaml 的值，还可以通过传递 data 用于读取任何字典的值
-        :param args:
-        :param data:
+        """ 递归获取 conf 中的值。getcfg 不仅可用于读取 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+        :param args: 需要读取的参数，支持多级调用，若级不存在，不会报错。
+        :param default_value: 找不到这个键就提供一个默认值。
+        :param data: 提供一个 dict，否则使用 cfg_data。
         :return:
         """
-        if data is None:
-            return None
-        elif data == 'cfg_file':
+        if data == 'cfg_file':
             data = self.cfg_data
-        if args:
-            if isinstance(data, dict):
-                return self.getcfg(*args[1:], data=data.get(args[0], default_value), default_value=default_value)
-            return data
+        if args and isinstance(data, dict):
+            cur_data = data.get(args[0], default_value)
+            return self.getcfg(*args[1:], default_value=default_value, data=cur_data)
         return data
+    
+    def setcfg(self, *args, value: Any, data: Union[str, dict]='cfg_file') -> None:
+        """ 递归设置 conf 中的值。setcfg 不仅可用于设置 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+        :param args: 需要设置的参数，支持多级调用，若级不存在，会自动创建一个内缪的 dict。
+        :param data: 提供一个 dict，否则使用 cfg_data。
+        :param value: 需要设置的值。
+        """
+        if data == 'cfg_file':
+            data = self.cfg_data
+        if args and isinstance(data, dict):
+            arg0 = args[0]
+            if len(args) > 1:
+                cur_data = data.get(arg0)
+                if cur_data is None:
+                    cur_data = {}
+                    data[arg0] = cur_data
+                self.setcfg(*args[1:], value=value, data=cur_data)
+            else:
+                data[arg0] = value
 
     def init_regionals(self, data: Union[str, dict]='cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)
