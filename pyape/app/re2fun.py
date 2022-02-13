@@ -8,12 +8,14 @@ re2 = request + response
 
 from pathlib import Path
 from datetime import datetime
+from typing import Union
 
 from flask import (request, jsonify, make_response, send_file)
+from sqlalchemy.orm import Query
 
 from pyape.app import gdb, logger
+from pyape.db import Pagination
 from pyape.util.func import parse_float, parse_date, daydt
-
 
 
 def get_post_data():
@@ -163,8 +165,8 @@ def get_min_max_value_query(query, value_column, min_value=None, max_value=None)
     return query
 
 
-def get_page_response(query, page, per_page, itemskey, return_method=None,
-                      replaceobj=None, replaceobj_key_only=False, **kwargs):
+def get_page_response(query: Union[Query, dict], page: int, per_page: int,
+        itemskey, return_method=None, replaceobj=None, replaceobj_key_only=False, **kwargs):
     """ 获取一个多页响应对象
     :param query: 查询对象，或者直接返回的对象
     :param page: 当前页
@@ -177,22 +179,19 @@ def get_page_response(query, page, per_page, itemskey, return_method=None,
     :return: 一个多页响应对象
     """
     data = None
-    # TODO 解决 BaseQuery 和 paginate 问题
-    # from flask_sqlalchemy import BaseQuery
-    # if isinstance(query, BaseQuery):
-    if isinstance(query, None):
+    if isinstance(query, Query):
         try:
-            pages = query.paginate(int(page), int(per_page), False)
-            data = dict(page=pages.page, prev_num=pages.prev_num, next_num=pages.next_num,
-                        has_next=pages.has_next, has_prev=pages.has_prev, pages=pages.pages,
-                        total=pages.total, per_page=pages.per_page, error=False, code=200)
+            pagi: Pagination = Pagination.paginate(query, int(page), int(per_page))
+            data = dict(page=pagi.page, prev_num=pagi.prev_num, next_num=pagi.next_num,
+                        has_next=pagi.has_next, has_prev=pagi.has_prev, pages=pagi.pages,
+                        total=pagi.total, per_page=pagi.per_page, error=False, code=200)
             if callable(return_method):
-                data[itemskey] = return_method(pages.items)
+                data[itemskey] = return_method(pagi.items)
                 return data
             elif return_method == 'model':
-                data[itemskey] = gdb.to_response_data(pages.items, replaceobj, replaceobj_key_only)
+                data[itemskey] = gdb.to_response_data(pagi.items, replaceobj, replaceobj_key_only)
                 return data
-            data[itemskey] = pages.items
+            data[itemskey] = pagi.items
         except Exception as e:
             logger.critical('re2fun.get_page_response error: %s', str(e))
             return responseto(message=str(e), error=True, code=500)
