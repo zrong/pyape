@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 
+from invoke.exceptions import Exit
+
 from pyape.tpl import base_dir as pyape_tpl_dir
 from pyape.builder import get_pyape_toml, get_pyape_toml_file, MAIN_CONFIG_FILES, SUPERVISOR_TPL_FILES, MAIN_PROJECT_FILES
 from pyape.builder.conf import ConfigReplacer
@@ -254,9 +256,12 @@ def start(ctx, cwd, env):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
-    d = Deploy(env, pyape_conf, conn, cwd)
-    d.start()
+    try:
+        from pyape.builder.fabric import GunicornDeploy as Deploy
+        d = Deploy(env, pyape_conf, conn, cwd)
+        d.start()
+    except Exit as e:
+        ctx.fail(e.message)
 
 
 @click.command(help='「远程」在服务器上停止项目进程。')

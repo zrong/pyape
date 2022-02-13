@@ -15,7 +15,7 @@ from sqlalchemy.engine import Engine, create_engine
 
 
 class DBManager(object):
-    default_uri: str = None
+    default_bind_key: str = None
     URI: Union[dict, str] = None
     # 保存 engines 对象
     __engines: dict = None
@@ -59,10 +59,10 @@ class DBManager(object):
         
     def __set_default_uri(self) -> None:
         if isinstance(self.URI, dict):
-            self.default_uri = self.URI.keys()[0]
+            self.default_bind_key = self.URI.keys()[0]
 
     def get_Model(self, bind_key: str=None):
-        return self.__model_classes.get(bind_key or self.default_uri)
+        return self.__model_classes.get(bind_key or self.default_bind_key)
 
     def set_Model(self, bind_key: str=None):
         """ 设置并保存一个 Model
@@ -71,10 +71,10 @@ class DBManager(object):
         if self.__model_classes.get(bind_key):
             raise KeyError(bind_key)
         self.__model_classes[bind_key] = declarative_base(name=bind_key or 'Model')
-        return self.__model_classes.get(bind_key or self.default_uri)
+        return self.__model_classes.get(bind_key or self.default_bind_key)
         
     def get_engine(self, bind_key: str=None) -> Engine:
-        return self.__engines.get(bind_key or self.default_uri)
+        return self.__engines.get(bind_key or self.default_bind_key)
     
     def create_sessions(self, is_scoped: bool=False) -> dict[Session]:
         """ 根据 URI 的定义创建所有需要的 session 实例"""
@@ -88,12 +88,12 @@ class DBManager(object):
     
     def create_session(self, bind_key: str=None) -> Session:
         """ 创建一个 session 实例"""
-        SF = self.__session_factories.get(bind_key or self.default_uri)
+        SF = self.__session_factories.get(bind_key or self.default_bind_key)
         return SF()
 
     def create_scoped_session(self, bind_key: str=None) -> Session:
         """ 创建一个 scoped session 实例"""
-        SF = self.__session_factories.get(bind_key or self.default_uri)
+        SF = self.__session_factories.get(bind_key or self.default_bind_key)
         import flask
         return scoped_session(SF, scopefunc=flask._app_ctx_stack.__ident_func__)
         
@@ -125,9 +125,12 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
-    def session(self, bind_key: str=None) -> Session:
+    def session(self, bind_key: str=None, create_new: bool=True) -> Session:
         """ 获取对应的 session 实例
+        :param create_new: 使用独立的 session 实例
         """
+        if create_new:
+            return self.dbm.create_scoped_session(bind_key) if self.in_flask else self.dbm.create_session(bind_key) 
         return self.__sessions[bind_key]
 
     def query(self, model_cls, bind_key: str=None) -> Query:
