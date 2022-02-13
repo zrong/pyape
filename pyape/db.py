@@ -188,7 +188,9 @@ class DBManager(object):
             # 保存 session factory
             self.__session_factories[name] = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             # 保存 Model class
-            self.__model_classes[name] = declarative_base(name=name or 'Model')
+            Model = declarative_base(name=name or 'Model')
+            Model.bind_key = name
+            self.__model_classes[name] = Model
         
     def __set_default_uri(self) -> None:
         if isinstance(self.URI, dict):
@@ -258,7 +260,7 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
-    def session(self, bind_key: str=None, create_new: bool=True) -> Session:
+    def session(self, bind_key: str=None, create_new: bool=False) -> Session:
         """ 获取对应的 session 实例
         :param create_new: 使用独立的 session 实例
         """
@@ -266,8 +268,11 @@ class SQLAlchemy(object):
             return self.dbm.create_scoped_session(bind_key) if self.in_flask else self.dbm.create_session(bind_key) 
         return self.__sessions[bind_key]
 
-    def query(self, model_cls, bind_key: str=None) -> Query:
-        return self.session(bind_key).query(model_cls)
+    def query(self, model_cls) -> Query:
+        """ 获取一个 Query 对象
+        :param model_cls: 一个 Model对象，该对象在创建的时候一定有定义 bind_key。
+        """
+        return self.session(model_cls.bind_key).query(model_cls)
         
     def metadata(self, bind_key: str=None) -> MetaData:
         """ 获取对应 Model 的 metadata 实例

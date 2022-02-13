@@ -6,6 +6,7 @@ pyape.app.models.regional
 """
 import time
 import toml
+from sqlalchemy.orm import Query
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import Enum, SMALLINT, VARCHAR, INTEGER, FLOAT, TEXT, TIMESTAMP
 from sqlalchemy import  Column, ForeignKey
@@ -28,7 +29,7 @@ def r2type(r):
     return None
 
 
-def get_regional_qry(regional_cls, kindtype=None, rtype=None, status=None):
+def get_regional_qry(regional_cls, kindtype=None, rtype=None, status=None) -> Query:
     """ 获取排序过的 Regional 项目，可以根据 kindtype/rtype/status 筛选
     :param kindtype:
     :param rtype:
@@ -47,12 +48,12 @@ def get_regional_qry(regional_cls, kindtype=None, rtype=None, status=None):
             cause.append(regional_cls.r.between(2000, 2999))
         else:
             cause.append(regional_cls.r.between(5000, 5999))
-    return gdb.session(regional_cls.bind_key).query(regional_cls).\
+    return gdb.query(regional_cls).\
             filter(*cause).\
             order_by(regional_cls.status, regional_cls.createtime.desc())
 
 
-def make_regional_table_cls(table_name: str='vo', bind_key: str=None):
+def make_regional_table_cls(table_name: str='regional', bind_key: str=None):
     """ Regional 配置
     """
     def _merge(self):
@@ -102,7 +103,7 @@ def get_regional_config(regional_cls, status=None):
     """ 从数据库中读取 regional 的配置，转换成 RegionalConfig
     """
     # 取出数据库中所有启用的 Regional
-    qry = gdb.session(regional_cls.bind_key).query(regional_cls)
+    qry = gdb.query(regional_cls)
     if isinstance(status, int):
         qry = qry.filter_by(status=status)
     regional_list = [ritem.merge() for ritem in qry.all()]
@@ -114,7 +115,7 @@ def check_regional(regional_cls, r: int, ignore_zero: bool=False):
     :param ignore_zero: 值为真，则允许 r 值为 0。0 是一个特殊的 r 值，代表全局 r
     :return: 已经转换成整数的 regional 值，以及数据库中查到的 regional 配置
     """
-    qry = gdb.session(regional_cls.bind_key).query(regional_cls)
+    qry = gdb.query(regional_cls)
     r = parse_int(r)
     if r is None:
         return None, None
@@ -133,7 +134,7 @@ def check_regionals(regional_cls, rs: list[int], ignore_zero=False):
     :param ignore_zero: 值为真，则允许 rs 值为 [0]。0 是一个特殊的 r 值，代表全局 r
     """
     lenrs = len(rs)
-    qry = gdb.session(regional_cls.bind_key).query(regional_cls)
+    qry = gdb.query(regional_cls)
     if ignore_zero:
         # 传递 0 的时候， rs 只能拥有 1 个项： 0
         if lenrs == 1 and parse_int(rs[0]) == 0:
@@ -145,13 +146,14 @@ def check_regionals(regional_cls, rs: list[int], ignore_zero=False):
 def init_regional(regional_cls):
     """ 初始化 regional0 这是必须存在的一条
     """
-    qry = gdb.query(regional_cls, bind_key=regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key)
+    qry = session.query(regional_cls)
     r0 = qry.get(0)
     if r0 is not None:
         raise ValueError('The regional 0 is exists!')
 
     now = int(time.time())
     r0 = regional_cls(r=0, name='0', kindtype=0, status=1, createtime=now, updatetime=now)
-    resp = commit_and_response_error(r0, return_dict=True)
+    resp = commit_and_response_error(r0, session, return_dict=True)
     if resp is not None:
         raise SQLAlchemyError('Init regional table error: %s' % resp['message'])

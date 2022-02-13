@@ -162,10 +162,10 @@ def get_vo_fullname(r, name):
     return 'r%s_%s' % (r, name)
 
 
-def get_vo_by_fullname(fullname: str, type_=None, merge=None, bind_key: str=None):
+def get_vo_by_fullname(vo_cls, fullname: str, type_=None, merge=None, bind_key: str=None):
     """ 获取一个 vo，此处提供的 name 完整名称
     """
-    vo = gdb.session(bind_key).query().filter_by(name=fullname, status=1).first()
+    vo = gdb.query(vo_cls).filter_by(name=fullname, status=1).first()
     if vo is not None:
         if isinstance(merge, list):
             return vo.merge(merge, type_)
@@ -173,11 +173,11 @@ def get_vo_by_fullname(fullname: str, type_=None, merge=None, bind_key: str=None
     return None
 
 
-def get_vo_by_name(r:int, name: str, type_=None, merge=None, bind_key: str=None):
+def get_vo_by_name(vo_cls, r:int, name: str, type_=None, merge=None, bind_key: str=None):
     """ 获取一个 vo，此处提供的 name 是不含 r 前缀的名称
     """
     fullname = get_vo_fullname(r, name)
-    return get_vo_by_fullname(fullname, type_, merge, bind_key=bind_key)
+    return get_vo_by_fullname(vo_cls, fullname, type_, merge, bind_key=bind_key)
 
 
 def get_vo_query(vo_cls, r: int, votype: int=None, status=None):
@@ -191,12 +191,12 @@ def get_vo_query(vo_cls, r: int, votype: int=None, status=None):
         cause.append(vo_cls.votype == votype)
     if status is not None:
         cause.append(vo_cls.status == status)
-    return gdb.session(vo_cls.bind_key).query(vo_cls).filter(*cause).\
+    return gdb.query(vo_cls).filter(*cause).\
             order_by(vo_cls.status, vo_cls.index, vo_cls.createtime.desc())
 
 
 def get_vos_vidname(vo_cls, votype: int):
-    vos = gdb.session(vo_cls.bind_key).query(votype).filter_by(votype=votype, status=1).\
+    vos = gdb.query(votype).filter_by(votype=votype, status=1).\
         with_entities(vo_cls.vid, vo_cls.name).\
         all()
     return vos
@@ -211,6 +211,7 @@ def del_vo_vidname(vo_cls, vid: int, name: str):
         session.commit()
     except SQLAlchemyError as e:
         msg = 'valueobject.del_vo_vidname error: ' + str(e)
+        session.rollback()
         logger.error(msg)
         return msg
     return None

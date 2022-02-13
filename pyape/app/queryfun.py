@@ -6,8 +6,9 @@ pyape.app.queryfun
 """
 from flask import jsonify
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
-from pyape.app import gdb, logger
+from pyape.app import logger
 
 
 def sql_from_unixtime(dtfield, dtformat='%Y-%m-%d'):
@@ -34,11 +35,10 @@ def get_total_value(query, sum_field):
     return 0 if total_value_entry.total_value is None else int(total_value_entry.total_value)
 
 
-def commit_and_response_error(inst, refresh=False, delete=False, return_dict=False, bind_key: str=None):
+def commit_and_response_error(inst, session: Session, refresh=False, delete=False, return_dict=False):
     """ 将提交一个 instance 并返回错误响应，封装成一个操作
     """
     try:
-        session = gdb.session(bind_key)
         if delete:
             session.delete(inst)
         else:

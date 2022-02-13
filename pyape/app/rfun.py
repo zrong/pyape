@@ -36,10 +36,9 @@ def regional_get(regional_cls, r, merge):
     :param merge: 若 merge 为 0，则直接返回原始数据；
                     若 merge 为 1，执行 Regional 中的 merge 方法
     """
-    session = gdb.session(regional_cls.bind_key)
     if r is None:
         return responseto('Param please!', code=401)
-    robj = session.query(regional_cls).get(r)
+    robj = gdb.query(regional_cls).get(r)
     if robj is None:
         return responseto('No regional %s!' % r, code=404)
 
@@ -95,7 +94,8 @@ def regional_add(regional_cls, r, name, value, kindtype, status):
 
     now = int(time.time())
     robj = regional_cls(r=r, name=name, value=value, status=status, kindtype=kindtype, createtime=now, updatetime=now)
-    resp = commit_and_response_error(robj, refresh=True, bind_key=regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key)
+    resp = commit_and_response_error(robj, session, refresh=True, bind_key=regional_cls.bind_key)
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
@@ -108,7 +108,7 @@ def regional_edit(regional_cls, r, name, value, kindtype, status):
     kindtype = parse_int(kindtype)
     if r is None:
         return responseto('Param please!', code=401)
-    robj = gdb.session(regional_cls.bind_key).query(regional_cls).get(r)
+    robj = gdb.query(regional_cls).get(r)
     if robj is None:
         return responseto('找不到 regional %s!' % r, code=404)
     if name is not None:
@@ -126,7 +126,8 @@ def regional_edit(regional_cls, r, name, value, kindtype, status):
     if status is not None:
         robj.status = status
     robj.updatetime = int(time.time())
-    resp = commit_and_response_error(robj, refresh=True, bind_key=regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key)
+    resp = commit_and_response_error(robj, session, refresh=True, bind_key=regional_cls.bind_key)
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
@@ -138,12 +139,13 @@ def regional_del(regional_cls, valueobject_cls, r):
     if r is None:
         return responseto('Param please!', code=401)
     # 必须先删除所有的与这个 Regional 相关的关系
-    vo = gdb.session(valueobject_cls.bind_key).query(valueobject_cls).filter_by(r=r).first()
+    vo = gdb.query(valueobject_cls).filter_by(r=r).first()
     if vo is not None:
         return responseto('Please delete valueobjet of %s first!' % r, code=403)
 
-    robj = gdb.session(regional_cls.bind_key).query(regional_cls).filter_by(r=r).first()
-    resp = commit_and_response_error(robj, delete=True, bind_key=regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key)
+    robj = session.query(regional_cls).filter_by(r=r).first()
+    resp = commit_and_response_error(robj, session, delete=True, bind_key=regional_cls.bind_key)
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
