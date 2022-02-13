@@ -158,7 +158,7 @@ def get_logging_handler(type_, fmt, level=logging.INFO, target=None, name=None) 
     return handler
 
 
-def get_pyzog_handler(name, config_dict, target_dir, level=logging.INFO):
+def get_pyzog_handler(name, logger_config, target_dir, level=logging.INFO):
     """ 获取一个 pyzog handler
     如果不存在 pyzog 配置，那么会返回一个 file handler
     :param name: logger 的名称
@@ -168,12 +168,12 @@ def get_pyzog_handler(name, config_dict, target_dir, level=logging.INFO):
     """
     # 如果存在 pyzog 配置，则使用它
     pyzog_conf = None
-    if isinstance(config_dict.get('LOGGER'), dict):
-        pyzog_conf = config_dict['LOGGER'].get('pyzog')
+    if isinstance(logger_config, dict):
+        pyzog_conf = logger_config.get('pyzog')
 
-    if pyzog_conf is None:
-        return get_logging_handler('file', 'json', level, target=target_dir, name=name)
-    return get_logging_handler(pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name)
+    if isinstance(pyzog_conf, dict):
+        return get_logging_handler(pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name)
+    return get_logging_handler('file', 'json', level, target=target_dir, name=name)
 
 
 def get_logger(name, target, type_='file', fmt='text', level=logging.INFO):

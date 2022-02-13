@@ -269,9 +269,9 @@ def init_logger(pyape_app: PyapeFlask):
         if name is None:
             logger_name = 'app'
         else:
-            logger_name = 'app.%s' % name
+            logger_name = f'app.{name}'
         level = logging.INFO
-        handler = get_pyzog_handler(logger_name, pyape_app._gconf.getcfg(), pyape_app._gconf.getdir('logs'), level=level)
+        handler = get_pyzog_handler(logger_name, pyape_app._gconf.getcfg('LOGGER'), pyape_app._gconf.getdir('logs'), level=level)
 
     flasklogger.setLevel(level)
     sqlalchemylogger.setLevel(logging.WARNING)
