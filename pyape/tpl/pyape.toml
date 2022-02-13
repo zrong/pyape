@@ -35,7 +35,7 @@ REPLACE_ENVIRON = ['ADMIN_NAME', 'ADMIN_PASSWORD', 'SECRET_KEY', 'SQLALCHEMY_URI
 # 用于 deploy 上传时排除本地文件
 RSYNC_EXCLUDE = [
     '.DS_Store', '*.pyc', 'fab*', '__pycache__', '.pytest_cache',
-    '.vscode', '*.code-workspace', '*.swp', '*.iml', 
+    '.vscode', '*.code-workspace', '*.swp', '*.iml', 'node_modules',
     '.git', '.pyenv', 'venv', '.gitignore', 
     'wiki', 'output', 'tests', 'logs', 'wechat_sdk', 'flask_sqlalchemy',
     '*.jinja2', '*.dot', '*.json', '*.toml', '*.sqlite', '*.db',

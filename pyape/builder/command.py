@@ -147,6 +147,8 @@ def setup(ctx, cwd):
     setup_py = cwd.joinpath('setup.py')
     if not cwd.joinpath(setup_py).exists():
         ctx.fail('Please create a file named "setup.py" in project root directory.')
+    import sys
+    sys.path.insert(0, cwd.as_posix())
     from importlib.util import spec_from_file_location, module_from_spec
     spec = spec_from_file_location('pyape.setup', setup_py)
     mod = module_from_spec(spec)

@@ -17,8 +17,6 @@ from typing import Callable
 import flask
 
 from sqlalchemy.inspection import inspect
-from sqlalchemy.orm import Session, Query
-from sqlalchemy.schema import MetaData
 from flask_compress import Compress
 
 from pyape import uwsgiproxy
@@ -31,10 +29,7 @@ from pyape.flask_redis import FlaskRedis
 from pyape.flask_extend import PyapeFlask, PyapeResponse, FlaskConfig
 
 
-gconfig: GlobalConfig = None
-sqlinst: SQLAlchemy = None
-
-class PyapeDB:
+class PyapeDB(SQLAlchemy):
     _gconf: GlobalConfig = None
 
     # 根据 bind_key 动态生成的 table class，存储在这个 dict 中
@@ -50,52 +45,9 @@ class PyapeDB:
         self.__dynamic_table_cls = {}
         self.__regional_table_cls = {}
         self._gconf = gconf
+        sql_uri = gconf.getcfg('SQLALCHEMY', 'URI')
+        super().__init__(URI=sql_uri, is_flask=True)
 
-    def Model(self, bind_key: str=None):
-        """ 获取对应的 Model Factory class
-        """
-        return sqlinst.Model(bind_key)
-
-    def query(self, model_cls, bind_key: str=None) -> Query:
-        return self.session(bind_key).query(model_cls)
-
-    def session(self, bind_key: str=None) -> Session:
-        """ 获取对应的 session 实例
-        """
-        return sqlinst.session(bind_key)
-        
-    def metadata(self, bind_key: str=None) -> MetaData:
-        """ 获取对应 Model 的 metadata 实例
-        """
-        return self.Model(bind_key).metadata
-
-    def create_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
-        """ 创建 table 
-        """
-        sqlinst.create_tables(table_names, bind_key)
-
-    def drop_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
-        """ 移除 table
-        """
-        sqlinst.drop_tables(table_names, bind_key)
-        
-    def create_all(self) -> None:
-        """ 创建所有的表"""
-        sqlinst.create_all()
-
-    def drop_all(self) -> None:
-        """ 移除所有的表"""
-        sqlinst.drop_all()
-
-    def execute(self, sql, use_session: bool=False, bind_key: str=None):
-        return sqlinst.execute(sql, use_session, bind_key)
-    
-    def sall(self, sql, one_entity: bool=True, bind_key: str=None) -> list:
-        return sqlinst.sall(sql, one_entity, bind_key)
-
-    def sone(self, sql, one_eneity: bool=True, bind_key: str=None) -> list:
-        return sqlinst.sone(sql, one_eneity, bind_key)
-        
     def __get_dynamic_table_key(self, table_name: str, bind_key: str) -> str:
         """ 获取一个用于存储动态生成的 table class 的键名
         键名是采用 bind_key 和 table_name 拼接而成
@@ -164,12 +116,6 @@ class PyapeDB:
         # logger.info('get_regional_table %s', Cls)
         return Cls
 
-    def ismodel(self, instance, bind_key: str=None):
-        """ 判断一个实例是否是 Model 的实例
-        """
-        Model = sqlinst.Model(bind_key=bind_key)
-        return isinstance(instance, Model)
-
     def result2dict(self, result, keys, replaceobj=None, replaceobj_key_only=False):
         """
         根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict
@@ -216,7 +162,7 @@ class PyapeDB:
         if isinstance(result, dict):
             return result
         # 转换 Model 到 dict
-        if self.ismodel(result, bind_key):
+        if self.isModel(result, bind_key):
             return self.result2dict(result, inspect(result).mapper.column_attrs.keys(), replaceobj, replaceobj_key_only)
         # zrong 2017-10-11
         # 若使用 session.query 的方式查询，返回的结果是 <class 'sqlalchemy.util._collections.result'>
@@ -262,6 +208,9 @@ class PyapeRedis(FlaskRedis):
         return clients
 
 
+# 全局配置对象
+gconfig: GlobalConfig = None
+
 # 全局的数据库引用，保存的是 PyapeDB 的实例
 gdb: PyapeDB = None
 
@@ -282,11 +231,11 @@ def init_db(pyape_app: PyapeFlask):
     sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
     if sql_uri is None:
         return
-    global gdb, sqlinst
-    sqlinst = SQLAlchemy(URI=sql_uri, in_flask=True)
+    # global gdb, sqlinst
+    # sqlinst = SQLAlchemy(URI=sql_uri, in_flask=True)
+    global gdb
     if gdb is not None:
         raise ValueError('gdb 不能重复定义！')
-    # db 初始化的时候带上 app 参数，这样就不必再次 init_app
     gdb = PyapeDB(gconf=pyape_app._gconf)
     pyape_app._gdb = gdb
 

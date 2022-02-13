@@ -10,7 +10,7 @@
 
 from typing import Iterable, Union
 from sqlalchemy.schema import Table, MetaData
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session, Query
 from sqlalchemy.engine import Engine, create_engine
 
 
@@ -119,10 +119,19 @@ class SQLAlchemy(object):
         """
         return self.dbm.get_Model(bind_key)
 
+    def isModel(self, instance, bind_key: str=None):
+        """ 判断一个实例是否是 Model 的实例
+        """
+        Model = self.Model(bind_key=bind_key)
+        return isinstance(instance, Model)
+
     def session(self, bind_key: str=None) -> Session:
         """ 获取对应的 session 实例
         """
         return self.__sessions[bind_key]
+
+    def query(self, model_cls, bind_key: str=None) -> Query:
+        return self.session(bind_key).query(model_cls)
         
     def metadata(self, bind_key: str=None) -> MetaData:
         """ 获取对应 Model 的 metadata 实例
