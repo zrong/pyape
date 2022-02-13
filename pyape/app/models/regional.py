@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import Enum, SMALLINT, VARCHAR, INTEGER, FLOAT, TEXT, TIMESTAMP
 from sqlalchemy import  Column, ForeignKey
 
-from pyape.app import gdb
+from pyape.app import gdb, logger
 from pyape.app.queryfun import commit_and_response_error
 from pyape.config import RegionalConfig
 from pyape.util.func import parse_int
@@ -145,9 +145,10 @@ def check_regionals(regional_cls, rs: list[int], ignore_zero=False):
 def init_regional(regional_cls):
     """ 初始化 regional0 这是必须存在的一条
     """
-    r0 = gdb.session(regional_cls.bind_key).query(regional_cls).get(0)
+    qry = gdb.query(regional_cls, bind_key=regional_cls.bind_key)
+    r0 = qry.get(0)
     if r0 is not None:
-        raise TypeError('The regional 0 is exists!')
+        raise ValueError('The regional 0 is exists!')
 
     now = int(time.time())
     r0 = regional_cls(r=0, name='0', kindtype=0, status=1, createtime=now, updatetime=now)

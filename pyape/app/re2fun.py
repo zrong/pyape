@@ -10,7 +10,6 @@ from pathlib import Path
 from datetime import datetime
 
 from flask import (request, jsonify, make_response, send_file)
-from flask_sqlalchemy import BaseQuery
 
 from pyape.app import gdb, logger
 from pyape.util.func import parse_float, parse_date, daydt
@@ -178,7 +177,10 @@ def get_page_response(query, page, per_page, itemskey, return_method=None,
     :return: 一个多页响应对象
     """
     data = None
-    if isinstance(query, BaseQuery):
+    # TODO 解决 BaseQuery 和 paginate 问题
+    # from flask_sqlalchemy import BaseQuery
+    # if isinstance(query, BaseQuery):
+    if isinstance(query, None):
         try:
             pages = query.paginate(int(page), int(per_page), False)
             data = dict(page=pages.page, prev_num=pages.prev_num, next_num=pages.next_num,

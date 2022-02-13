@@ -112,7 +112,7 @@ class SQLAlchemy(object):
             dbm = DBManager(URI, **kwargs)
         self.dbm = dbm
         self.in_flask = in_flask
-        self.__sessions = self.dbm.create_sessions(in_flask)
+        self.__sessions = self.dbm.create_sessions(is_scoped=in_flask)
 
     def Model(self, bind_key: str=None):
         """ 获取对应的 Model Factory class

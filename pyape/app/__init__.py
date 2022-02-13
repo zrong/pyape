@@ -17,7 +17,7 @@ from typing import Callable
 import flask
 
 from sqlalchemy.inspection import inspect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, Query
 from sqlalchemy.schema import MetaData
 from flask_compress import Compress
 
@@ -56,10 +56,13 @@ class PyapeDB:
         """
         return sqlinst.Model(bind_key)
 
+    def query(self, model_cls, bind_key: str=None) -> Query:
+        return self.session(bind_key).query(model_cls)
+
     def session(self, bind_key: str=None) -> Session:
         """ 获取对应的 session 实例
         """
-        return self.__sessions[bind_key]
+        return sqlinst.session(bind_key)
         
     def metadata(self, bind_key: str=None) -> MetaData:
         """ 获取对应 Model 的 metadata 实例
@@ -75,6 +78,14 @@ class PyapeDB:
         """ 移除 table
         """
         sqlinst.drop_tables(table_names, bind_key)
+        
+    def create_all(self) -> None:
+        """ 创建所有的表"""
+        sqlinst.create_all()
+
+    def drop_all(self) -> None:
+        """ 移除所有的表"""
+        sqlinst.drop_all()
 
     def execute(self, sql, use_session: bool=False, bind_key: str=None):
         return sqlinst.execute(sql, use_session, bind_key)
@@ -399,8 +410,6 @@ def _init_common(gconf: GlobalConfig=None, cls_config=None) -> PyapeFlask:
     if gconf is None:
         gconf = GlobalConfig(Path.cwd())
     sys.modules[__name__].__dict__['gconfig'] = gconf
-    sqlinst = SQLAlchemy(URI=gconf.getcfg('FLASK', 'SQLALCHEMY_URI'))
-
     flask.cli.load_dotenv()
 
     pyape_app = create_app(gconf ,**cls_config) if isinstance(cls_config, dict) else create_app(gconf)
