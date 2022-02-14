@@ -171,8 +171,7 @@ def get_pyzog_handler(name, logger_config, target_dir, level=logging.INFO):
     if isinstance(logger_config, dict):
         pyzog_conf = logger_config.get('pyzog')
 
-    keys = pyzog_conf.keys()
-    if isinstance(pyzog_conf, dict) and 'type' in keys and 'target' in keys:
+    if isinstance(pyzog_conf, dict) and len(pyzog_conf) > 0:
         return get_logging_handler(pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name)
     return get_logging_handler('file', 'json', level, target=target_dir, name=name)
 
