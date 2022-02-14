@@ -290,6 +290,15 @@ def reload(ctx, cwd, env):
     d.reload()
 
 
+@click.command(help='「远程」在服务器上部署代码，然后执行重载。也就是 deploy and reload 的组合。')
+@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option('--env', '-E', required=True, help='输入支持的环境名称。')
+@click.pass_context
+def dar(ctx, cwd, env):
+    ctx.invoke(deploy, env=env, cwd=cwd)
+    ctx.invoke(reload, env=env, cwd=cwd)
+
+
 @click.command(help='「远程」打印所有的过期的 python package。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
@@ -316,6 +325,7 @@ main.add_command(deploy)
 main.add_command(start)
 main.add_command(stop)
 main.add_command(reload)
+main.add_command(dar)
 main.add_command(pipoutdated)
 
 
