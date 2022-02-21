@@ -46,7 +46,7 @@ class PyapeDB(SQLAlchemy):
         self.__regional_table_cls = {}
         self._gconf = gconf
         sql_uri = gconf.getcfg('SQLALCHEMY', 'URI')
-        super().__init__(URI=sql_uri, is_flask=True)
+        super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
 
     def __get_dynamic_table_key(self, table_name: str, bind_key: str) -> str:
         """ 获取一个用于存储动态生成的 table class 的键名

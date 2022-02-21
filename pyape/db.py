@@ -10,6 +10,7 @@
 
 import math
 from typing import Iterable, Union
+from xmlrpc.client import boolean
 from sqlalchemy.schema import Table, MetaData
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session, Query
 from sqlalchemy.engine import Engine, create_engine
@@ -226,28 +227,34 @@ class DBManager(object):
         SF = self.__session_factories.get(bind_key or self.default_bind_key)
         return SF()
 
-    def create_scoped_session(self, bind_key: str=None) -> Session:
+    def create_scoped_session(self, bind_key: str=None, in_flask: bool=False) -> Session:
         """ 创建一个 scoped session 实例"""
         SF = self.__session_factories.get(bind_key or self.default_bind_key)
-        import flask
-        return scoped_session(SF, scopefunc=flask._app_ctx_stack.__ident_func__)
+        if in_flask:
+            import flask
+            return scoped_session(SF, scopefunc=flask._app_ctx_stack.__ident_func__)
+        return scoped_session(SF)
         
 
 class SQLAlchemy(object):
     dbm: DBManager = None
+    is_scoped: bool = True
     in_flask: bool = True
 
-    def __init__(self, dbm: DBManager=None, URI: dict=None, in_flask: bool=True, **kwargs: dict) -> None:
+    def __init__(self, dbm: DBManager=None, URI: dict=None, is_scoped: bool=True, in_flask: bool=False, **kwargs: dict) -> None:
         """ 创建一个用 sqlalchemy 管理数据库的对象
         :param dbm: DBManager 的实例
         :param URI: 若不提供 dbm 则使用 URI 数据新建 DBManager
-        :param in_flask: 是否在 flask 内部使用。创建 Session 实例的时候会使用 scoped_session
+        :param is_scoped: 为了现成安全，使用 scoped session。
+        :param in_flask: 是否在 Flask 框架内部。在 Flask内 内部使用。创建 Session 实例的时候会使用 scoped_session。
         """
         if dbm is None:
             dbm = DBManager(URI, **kwargs)
         self.dbm = dbm
         self.in_flask = in_flask
-        self.__sessions = self.dbm.create_sessions(is_scoped=in_flask)
+        # 若 in_flask 为真，则 is_scoped 一定为真
+        self.is_scoped = True if in_flask else is_scoped
+        self.__sessions = self.dbm.create_sessions(is_scoped=is_scoped)
 
     def Model(self, bind_key: str=None):
         """ 获取对应的 Model Factory class
@@ -265,7 +272,7 @@ class SQLAlchemy(object):
         :param create_new: 使用独立的 session 实例
         """
         if create_new:
-            return self.dbm.create_scoped_session(bind_key) if self.in_flask else self.dbm.create_session(bind_key) 
+            return self.dbm.create_scoped_session(bind_key, self.in_flask) if self.is_scoped else self.dbm.create_session(bind_key) 
         return self.__sessions[bind_key]
 
     def query(self, model_cls) -> Query:
