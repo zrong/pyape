@@ -295,8 +295,11 @@ def reload(ctx, cwd, env):
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def dar(ctx, cwd, env):
-    ctx.invoke(deploy, env=env, cwd=cwd)
-    ctx.invoke(reload, env=env, cwd=cwd)
+    try:
+        ctx.invoke(deploy, env=env, cwd=cwd)
+        ctx.invoke(reload, env=env, cwd=cwd)
+    except Exception as e:
+        ctx.fail(str(e))
 
 
 @click.command(help='「远程」打印所有的过期的 python package。')

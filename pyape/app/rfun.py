@@ -94,8 +94,9 @@ def regional_add(regional_cls, r, name, value, kindtype, status):
 
     now = int(time.time())
     robj = regional_cls(r=r, name=name, value=value, status=status, kindtype=kindtype, createtime=now, updatetime=now)
-    session = gdb.session(regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key, create_new=True)
     resp = commit_and_response_error(robj, session, refresh=True, bind_key=regional_cls.bind_key)
+    session.close()
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
@@ -126,8 +127,9 @@ def regional_edit(regional_cls, r, name, value, kindtype, status):
     if status is not None:
         robj.status = status
     robj.updatetime = int(time.time())
-    session = gdb.session(regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key, create_new=True)
     resp = commit_and_response_error(robj, session, refresh=True, bind_key=regional_cls.bind_key)
+    session.close()
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
@@ -143,9 +145,10 @@ def regional_del(regional_cls, valueobject_cls, r):
     if vo is not None:
         return responseto('Please delete valueobjet of %s first!' % r, code=403)
 
-    session = gdb.session(regional_cls.bind_key)
+    session = gdb.session(regional_cls.bind_key, create_new=True)
     robj = session.query(regional_cls).filter_by(r=r).first()
     resp = commit_and_response_error(robj, session, delete=True, bind_key=regional_cls.bind_key)
+    session.close()
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)
