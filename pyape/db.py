@@ -1,12 +1,12 @@
-#======================
-# 处理 pyape 数据库功能
-# 
-# 1. 解决 SQLAlchemy 线程问题
-# 2. 提供多数据库绑定支持
-#
-# @author zrong
-# @created 2022-02-07
-#======================
+"""
+pyape.db
+-------------------
+
+处理 pyape 数据库功能
+
+1. 解决 SQLAlchemy 线程问题
+2. 提供多数据库绑定支持
+"""
 
 import math
 from typing import Iterable, Union
@@ -149,6 +149,11 @@ class Pagination(object):
 
 
 class DBManager(object):
+    """ 管理 SQL 连接，可单独使用，也可以结合 SQLAlchemy 使用
+    
+    :param URI: 提供数据库地址
+    :param dict kwargs: 提供数据库连接参数
+    """
     default_bind_key: str = None
     URI: Union[dict, str] = None
     # 保存 engines 对象
@@ -159,7 +164,6 @@ class DBManager(object):
     __model_classes: dict = None
 
     def __init__(self, URI: Union[dict, str], **kwargs: dict) -> None:
-        """ 管理 SQL 连接，可单独使用，也可以结合 SQLAlchemy 使用"""
         self.__engines = {}
         self.__session_factories = {}
         self.__model_classes = {}
@@ -203,7 +207,8 @@ class DBManager(object):
     def set_Model(self, bind_key: str=None):
         """ 设置并保存一个 Model
         一般在多个数据库共享同一个 Model 的时候使用
-        此时使用默认创建的 Model 可能会造成混淆，最好是创建一个新的"""
+        此时使用默认创建的 Model 可能会造成混淆，最好是创建一个新的
+        """
         if self.__model_classes.get(bind_key):
             raise KeyError(bind_key)
         self.__model_classes[bind_key] = declarative_base(name=bind_key or 'Model')
@@ -237,17 +242,18 @@ class DBManager(object):
         
 
 class SQLAlchemy(object):
+    """ 创建一个用 sqlalchemy 管理数据库的对象
+
+    :param dbm: DBManager 的实例
+    :param URI: 若不提供 dbm 则使用 URI 数据新建 DBManager
+    :param is_scoped: 为了现成安全，使用 scoped session。
+    :param in_flask: 是否在 Flask 框架内部。在 Flask内 内部使用。创建 Session 实例的时候会使用 scoped_session。
+    """
     dbm: DBManager = None
     is_scoped: bool = True
     in_flask: bool = True
 
     def __init__(self, dbm: DBManager=None, URI: dict=None, is_scoped: bool=True, in_flask: bool=False, **kwargs: dict) -> None:
-        """ 创建一个用 sqlalchemy 管理数据库的对象
-        :param dbm: DBManager 的实例
-        :param URI: 若不提供 dbm 则使用 URI 数据新建 DBManager
-        :param is_scoped: 为了现成安全，使用 scoped session。
-        :param in_flask: 是否在 Flask 框架内部。在 Flask内 内部使用。创建 Session 实例的时候会使用 scoped_session。
-        """
         if dbm is None:
             dbm = DBManager(URI, **kwargs)
         self.dbm = dbm

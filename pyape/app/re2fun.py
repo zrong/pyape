@@ -1,6 +1,6 @@
 """
 pyape.app.re2fun
-~~~~~~~~~~~~~~~~~~~
+----------------------------
 
 请求和响应的常用方法封装
 re2 = request + response
@@ -74,6 +74,7 @@ def responseto(message: str=None, error: bool=None, code: int=None, data: dict=N
     replaceobj: dict=None, replaceobj_key_only: bool=False, return_dict: bool=False,
     bind_key: str=None, **kwargs):
     """ 封装 json 响应
+    
     :param message: 错误消息，若提供则默认 error 为 True
     :param error: 是否包含错误
     :param code: 错误代码，若不提供则值可能为 200 error=False/444 error=True
@@ -168,6 +169,7 @@ def get_min_max_value_query(query, value_column, min_value=None, max_value=None)
 def get_page_response(query: Union[Query, dict], page: int, per_page: int,
         itemskey, return_method=None, replaceobj=None, replaceobj_key_only=False, **kwargs):
     """ 获取一个多页响应对象
+
     :param query: 查询对象，或者直接返回的对象
     :param page: 当前页
     :param per_page: 每页项目数

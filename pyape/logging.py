@@ -1,3 +1,12 @@
+"""
+.. _pyape_logging:
+
+pyape.logging
+-------------------
+
+提供 logging 支持
+"""
+
 import logging 
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
@@ -113,6 +122,7 @@ def _create_zmq_handler(target):
 
 def _create_redis_handler(target, channel):
     """ 创建一个基于 zeromq 的 logging handler
+
     :param target: redis_url 字符串，形如： 
         redis://[[username]:[password]]@localhost:6379/0
         rediss://[[username]:[password]]@localhost:6379/0
@@ -123,11 +133,11 @@ def _create_redis_handler(target, channel):
     return RedisHandler(target, channel)
 
 
-def get_logging_handler(type_, fmt, level=logging.INFO, target=None, name=None) :
+def get_logging_handler(type_, fmt, level=logging.INFO, target=None, name=None):
     """ 获取一个 logger handler
 
-    :param type_: stream/file/zmq
-    :param fmt: text/json
+    :param str type_: stream/file/zmq
+    :param str fmt: text/json
     :param level: logging 的 level 级别
     :param target: 项目主目录的的 path 字符串或者 Path 对象，也可以是 tcp://127.0.0.1:8334 这样的地址
     :param name: logger 的名称，不要带扩展名
@@ -161,6 +171,7 @@ def get_logging_handler(type_, fmt, level=logging.INFO, target=None, name=None) 
 def get_pyzog_handler(name, logger_config, target_dir, level=logging.INFO):
     """ 获取一个 pyzog handler
     如果不存在 pyzog 配置，那么会返回一个 file handler
+    
     :param name: logger 的名称
     :param config_dict: config.json 配置文件的 dict
     :param target_dir: file handler 的目标文件夹
@@ -184,6 +195,8 @@ def get_logger(name, target, type_='file', fmt='text', level=logging.INFO):
     :param type_: stream/file/zmq/pyzog 若使用 pyzog ，则调用 get_pyzog_handler，fmt 参数必须为 config_dict
     :param fmt: text/json/config_dict 如果 type_ 参数为 pyzog，则必须为 config_dict
     :param level: logging 的 level 级别
+    :return: 一个 Logger 对象
+    :rtype: logging.Logger
     """
     hdr = None
     if type_ == 'pyzog':

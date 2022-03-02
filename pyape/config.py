@@ -1,8 +1,10 @@
 """
-pyape.config
-~~~~~~~~~~~~~~~~~~~
+.. _pyape_config:
 
-解析 config.json 配置文件
+pyape.config
+----------------------------
+
+解析 config.toml 配置文件
 提供配置文件相关的读取和写入方法
 """
 
@@ -67,6 +69,8 @@ class PYConf(dict):
 
 
 class RegionalConfig(object):
+    """ 为 Regional 机制提供的配置文件，用于解析 Regional 配置。
+    """
     rlist = None
     rdict = None
     rids = None
@@ -85,6 +89,10 @@ class RegionalConfig(object):
             self.rdict[r] = regional
 
     def get_regional(self, r):
+        """ 获取一个 regional 配置
+        :param int r: r 值
+        :rtype: dict
+        """
         return self.rdict.get(r)
 
     def check_regional(self, r, ignore_zero=False):
@@ -124,15 +132,21 @@ class RegionalConfig(object):
 
 
 class GlobalConfig(object):
+    """ 全局配置文件，对应 config.toml """
+
     # 全局变量，用于保存 config.json 载入的配置
     cfg_data = None
     regional = None
 
-    def __init__(self, work_dir=None, cfg_file='config.toml'):
+    def __init__(self, work_dir: Path=None, cfg_file: str='config.toml'):
+        """ 初始化全局文件
+        :param Path work_dir: 工作文件夹
+        :param str cfg_file:  相对于工作文件夹的配置文件地址
+        """
         self.__work_dir = work_dir
         if cfg_file:
             self.cfg_data = self.read(cfg_file, throw_error=True)
-        # self.cfg_json 可能是个 {}
+        # self.cfg_data 可能是个 {}
         if self.cfg_data:
             self.init_regionals(data=self.cfg_data)
 
@@ -171,19 +185,23 @@ class GlobalConfig(object):
     def getdir(self, *args, work_dir: Path=None) -> Path:
         """ 基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
         如果传递 basedir，就基于这个 basedir 创建路径
+        
+        :param args: 传递路径
+        :param Path work_dir: 工作文件夹
         """
         if work_dir is not None:
             return Path(work_dir, *args)
         if self.__work_dir is None:
-            raise ValueError('please set work_dir first!')
+            raise ValueError('Please set work_dir first!')
         return Path(self.__work_dir, *args)
 
     def getcfg(self, *args, default_value: Any=None, data: Union[str, dict]='cfg_file') -> Any:
         """ 递归获取 conf 中的值。getcfg 不仅可用于读取 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+
         :param args: 需要读取的参数，支持多级调用，若级不存在，不会报错。
         :param default_value: 找不到这个键就提供一个默认值。
         :param data: 提供一个 dict，否则使用 cfg_data。
-        :return:
+        :return: 获取的配置值
         """
         if data == 'cfg_file':
             data = self.cfg_data
@@ -194,6 +212,7 @@ class GlobalConfig(object):
     
     def setcfg(self, *args, value: Any, data: Union[str, dict]='cfg_file') -> None:
         """ 递归设置 conf 中的值。setcfg 不仅可用于设置 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+
         :param args: 需要设置的参数，支持多级调用，若级不存在，会自动创建一个内缪的 dict。
         :param data: 提供一个 dict，否则使用 cfg_data。
         :param value: 需要设置的值。

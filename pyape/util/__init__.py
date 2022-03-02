@@ -1,4 +1,11 @@
-__all__ = ['encrypt', 'func']
+"""
+pyape.util
+------------------
+
+封装的小工具
+"""
+
+__all__ = ['encrypt', 'func', 'gen']
 
 import hashlib
 import base64

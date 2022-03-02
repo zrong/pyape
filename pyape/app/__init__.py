@@ -1,6 +1,6 @@
 """
 pyape.app
-~~~~~~~~~~~~~~~~~~~
+----------------------
 
 处理 app 初始化，与 flask 强相关
 """
@@ -30,6 +30,7 @@ from pyape.flask_extend import PyapeFlask, PyapeResponse, FlaskConfig
 
 
 class PyapeDB(SQLAlchemy):
+    """ 封装 pyape 必须的数据库方法"""
     _gconf: GlobalConfig = None
 
     # 根据 bind_key 动态生成的 table class，存储在这个 dict 中
