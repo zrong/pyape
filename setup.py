@@ -62,7 +62,7 @@ setup(
     keywords = "development zrong flask wechat",
     python_requires='>=3.9, <4',
     packages = find_packages(exclude=['test*', 'doc*', 'fabric']),
-    install_requires=find_requires('requirements.txt'),
+    install_requires=find_requires('requirements', 'dev.txt'),
     entry_points=entry_points,
     include_package_data = True,
     zip_safe=False,

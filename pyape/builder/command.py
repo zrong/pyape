@@ -39,7 +39,6 @@ def write_config_file(ctx: click.Context, env_name: str, pyape_conf: dict, tpl_n
         ctx.fail(e)
 
 
-
 def copytplfile(srcdir, dstdir, keyname, filename, force=False, rename=False):
     """ 复制文件到目标文件夹
     :param srcdir: 源文件夹
@@ -137,6 +136,7 @@ def init(cwd, force):
     cwd = Path(cwd)
     for keyname, filename in MAIN_PROJECT_FILES.items():
         copytplfile(pyape_tpl_dir, cwd, keyname, filename, force, False)
+
 
 @click.command(help='「本地」创建 pyape 项目运行时必须的环境，例如数据库建立等。需要自行在项目根文件夹创建 setup.py。')
 @click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
