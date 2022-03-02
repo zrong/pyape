@@ -108,5 +108,6 @@ venv.bak/
 
 # pyape
 *.yaml
+!.readthedocs.yaml
 /logs
 /*.json
