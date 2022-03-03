@@ -30,6 +30,7 @@ def check_pyape_toml(cwd: str, ctx: click.Context) -> dict:
 
 def write_config_file(ctx: click.Context, env_name: str, pyape_conf: dict, tpl_name: str, work_dir: Path, tpl_dir: Path=None, target_postfix: str='', force: bool=True) -> None:
     """ 写入配置文件
+    
     :param target_postfix: 配置文件的后缀
     """
     try:
@@ -41,6 +42,7 @@ def write_config_file(ctx: click.Context, env_name: str, pyape_conf: dict, tpl_n
 
 def copytplfile(srcdir, dstdir, keyname, filename, force=False, rename=False):
     """ 复制文件到目标文件夹
+    
     :param srcdir: 源文件夹
     :param dstdir: 目标文件夹
     :param keyname: 文件 key 名称，files 的 key
@@ -97,6 +99,10 @@ def main():
 @click.argument('name', nargs=-1)
 @click.pass_context
 def gen(ctx, name, cwd, password: str, nonce: int):
+    """ pyape gen
+
+    使用生成
+    """
     cwd = Path(cwd)
     values = {}
     from pyape.util import gen
