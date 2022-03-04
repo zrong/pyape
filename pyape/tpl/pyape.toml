@@ -91,6 +91,7 @@ capture_output = true
 
 # uwsgi.ini 基本配置文件内容
 ['uwsgi.ini']
+callable = 'wsgi:{NAME}_app'
 processes = 2
 threads = 1
 venv = '%dvenv'

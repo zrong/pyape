@@ -5,9 +5,10 @@ import pyape.app
 import pyape.config
 from pyape.flask_extend import PyapeFlask, PyapeResponse
 
-
-appdir = Path(__file__).parent.resolve()
-gconfig = pyape.config.GlobalConfig(appdir)
+# 工作文件夹
+work_dir = Path(__file__).parent.resolve()
+# 读取主配置文件 config.toml
+gconfig = pyape.config.GlobalConfig(work_dir)
 
 
 class CustomResponse(PyapeResponse):

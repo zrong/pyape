@@ -198,6 +198,7 @@ pyape 会调用 `flask.cli.load_env <https://flask.palletsprojects.com/en/2.0.x/
 
 默认值为： ::
 
+    callable = 'wsgi:{NAME}_app'
     processes = 2
     threads = 1
     venv = '%dvenv'
@@ -212,6 +213,8 @@ pyape 会调用 `flask.cli.load_env <https://flask.palletsprojects.com/en/2.0.x/
     # Stat Server
     stats = '%d%nstats.sock
     
+配置中可用的参数，通过阅读 ``pyape.tpl.uwsgi.ini.jinja2`` 源码获取。
+
 .. _pyape_toml_config_toml:
     
 ['config.toml']

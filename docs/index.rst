@@ -73,12 +73,11 @@ Logging 集成
    :caption: 目录:
    
    usage
+   configuration
    command
    development
    dependent
    architecture
-   configuration
-   deploy
    reference
 
    

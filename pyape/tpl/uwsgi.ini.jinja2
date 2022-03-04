@@ -51,7 +51,7 @@ chdir = %d
 ; 执行的启动文件
 wsgi-file = wsgi.py
 ; 对应 wsgi.py 的同名全局变量，是一个 Flask app
-callable = mjpapp
+callable = {{callable}}
 
 {%- if socket %}
 ; 使用 nginx 转发，启动 socket 监听
