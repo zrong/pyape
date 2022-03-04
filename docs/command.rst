@@ -31,7 +31,7 @@ pyape
       top          「远程」展示 uwsgi 的运行情况。
       venv         「远程」部署远程服务器的虚拟环境。
 
-.. _pyape_init:
+.. _cli_pyape_init:
 
 pyape init
 --------------------
@@ -47,7 +47,7 @@ pyape init
       -F, --force          覆盖已存在的文件
       --help               Show this message and exit.
 
-.. _pyape_config:
+.. _cli_pyape_config:
 
 pyape config
 -------------------
@@ -66,7 +66,7 @@ pyape config
       -F, --force          是否强制替换已存在的文件。
       --help               Show this message and exit.
       
-.. _pyape_copy:
+.. _cli_pyape_copy:
 
 pyape copy
 -------------------
@@ -83,7 +83,7 @@ pyape copy
       -R, --rename         若目标文件存在则重命名
       --help               Show this message and exit.
       
-.. _pyape_deploy:
+.. _cli_pyape_deploy:
 
 pyape deploy
 ------------------
@@ -99,7 +99,7 @@ pyape deploy
       -E, --env TEXT       输入支持的环境名称。  [required]
       --help               Show this message and exit.
 
-.. _pyape_venv:
+.. _cli_pyape_venv:
 
 pyape venv
 -------------------
@@ -116,7 +116,7 @@ pyape venv
       -I, --init           是否初始化虚拟环境。
       --help               Show this message and exit.
       
-.. _pyape_start:
+.. _cli_pyape_start:
 
 pyape start
 -----------------
@@ -133,7 +133,7 @@ pyape start
       --help               Show this message and exit.
 
 
-.. _pyape_stop:
+.. _cli_pyape_stop:
 
 pyape stop
 ---------------
@@ -149,7 +149,7 @@ pyape stop
       -E, --env TEXT       输入支持的环境名称。  [required]
       --help               Show this message and exit.
 
-.. _pyape_reload:
+.. _cli_pyape_reload:
 
 pyape reload
 ---------------

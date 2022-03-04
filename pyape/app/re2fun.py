@@ -35,13 +35,13 @@ def get_post_data():
 def get_request_values(*args, replaceobj=None, defaultvalue={}, request_key='json'):
     """ 检测提供的 HTTP REQUEST 的值。包括 POST/PUT
 
-    replaceobj 参数替换。
-        例如 *args 中有个参数名称为 a1，但希望查询 json 中名为 a2 的键，
+    :param replaceobj: 参数替换。
+        例如 ``*args`` 中有个参数名称为 a1，但希望查询 json 中名为 a2 的键，
         则在 replaceobj 中设置 {"a1": "a2"}
-    defaultvalue 默认值。
+    :param defaultvalue: 默认值。
         若在参数中找不到值，则使用 defaultvalue 中的值替代。
-        例如 *args 中有个参数名称为 a1，但 json 中没有 a1，希望 a1 有一个默认值，则可以提供 {"a1": 42}
-    request_key 可用值为 
+        例如 ``*args`` 中有个参数名称为 a1，但 json 中没有 a1，希望 a1 有一个默认值，则可以提供 {"a1": 42}
+    :param request_key: 可用值为 
         args = request.args
         form = request.form
         values = request.values
@@ -174,7 +174,8 @@ def get_page_response(query: Union[Query, dict], page: int, per_page: int,
     :param page: 当前页
     :param per_page: 每页项目数
     :param itemskey: 对应 items 的键名
-    :param return_method: 若值不为 None 根据特定的方式转换 pages.items，返回 data 对象而非 Response 对象，同时会 ignore **kwargs 参数。
+    :param return_method:
+        若值不为 None 根据特定的方式转换 pages.items，返回 data 对象而非 Response 对象，同时会 ignore ``**kwargs`` 参数。
     :param replaceobj: 见 re2fun.responseto
     :param replaceobj_key_only:  见 re2fun.responseto
     :param kwargs: 见 re2fun.responseto

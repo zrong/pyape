@@ -63,6 +63,7 @@ class PyapeDB(SQLAlchemy):
 
     def set_dynamic_table(self, build_table_method: Callable, table_name: str, bind_key: str=None):
         """ 获取动态表
+
         :param table: 已经创建好的 table_cls
         :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class，参见 pyape.app.models.valueobject.make_value_object_table_cls
         """
@@ -76,6 +77,7 @@ class PyapeDB(SQLAlchemy):
 
     def build_regional_tables(self, name: str, build_table_method, rconfig: RegionalConfig):
         """ 根据 regionals 的配置创建多个表
+
         :param name: 表的名称前缀
         :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class
         :param rconfig: RegionalConfig 的实例
@@ -99,6 +101,7 @@ class PyapeDB(SQLAlchemy):
 
     def get_regional_table(self, name: str, r: int, build_table_method, rconfig: RegionalConfig):
         """ 根据 regionals 和表名称前缀获取一个动态创建的表
+
         :param name: 表的名称前缀
         :param r: regional
         :param rconfig: RegionalConfig 的实例
@@ -118,14 +121,14 @@ class PyapeDB(SQLAlchemy):
         return Cls
 
     def result2dict(self, result, keys, replaceobj=None, replaceobj_key_only=False):
-        """
-        根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict
+        """ 根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict
 
         :param result: 要转换的对象
         :param keys: 要转换对象的key list
         :param replaceobj: 可替换的键
         :param replaceobj_key_only: 仅包含可替换的键
-        :return dict: 转换成功的 dict
+        :return: 转换成功的 dict
+        :rtype: dict
         """
         rst = {}
         for key in keys:
@@ -186,6 +189,7 @@ class PyapeRedis(FlaskRedis):
 
     def get_regional_client(self, r, force=True):
         """ 根据 r 获取到一个 py_redis_client
+
         :param r: regional
         :param force: 没有 redis 配置会抛出 ValueError 异常。若设置为 False 则返回 None（无异常）
         """
@@ -376,10 +380,11 @@ def _init_common(gconf: GlobalConfig=None, cls_config=None) -> PyapeFlask:
 
 def init(gconf: GlobalConfig=None, init_app_method=None, cls_config=None) -> PyapeFlask:
     """ 初始化 APP
+
     :param gconf: pyape.config.GlobalConfig 的实例
     :param init_app: 外部初始化方法
     :param cls_config: 一个包含自定义 Class 的 dict
-        形如: {'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}
+        形如: ``{'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}``
         不需要同时包含 3 个 Class
     """
     pyape_app = _init_common(gconf, cls_config)
@@ -396,10 +401,11 @@ def init(gconf: GlobalConfig=None, init_app_method=None, cls_config=None) -> Pya
 
 def init_decorator(gconf: GlobalConfig=None, cls_config=None):
     """ 初始化 APP 的装饰器版本
+
     :param gconf: pyape.config.GlobalConfig 的实例
     :param init_app: 外部初始化方法
     :param cls_config: 一个包含自定义 Class 的 dict
-        形如: {'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}
+        形如: ``{'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}``
         不需要同时包含 3 个 Class
     """
     pyape_app = _init_common(gconf, cls_config)

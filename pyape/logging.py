@@ -132,7 +132,7 @@ def _create_redis_handler(target, channel):
     return RedisHandler(target, channel)
 
 
-def get_log_handler(type_, fmt, level=log.INFO, target=None, name=None):
+def get_logging_handler(type_, fmt, level=log.INFO, target=None, name=None):
     """ 获取一个 logger handler
 
     :param str type_: stream/file/zmq
@@ -182,20 +182,22 @@ def get_pyzog_handler(name, logger_config, target_dir, level=log.INFO):
         pyzog_conf = logger_config.get('pyzog')
 
     if isinstance(pyzog_conf, dict) and len(pyzog_conf) > 0:
-        return get_log_handler(pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name)
-    return get_log_handler('file', 'json', level, target=target_dir, name=name)
+        return get_logging_handler(pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name)
+    return get_logging_handler('file', 'json', level, target=target_dir, name=name)
 
 
 def get_logger(name, target, type_='file', fmt='text', level=log.INFO):
     """ 基于 target 创建一个 logger
 
     :param name: logger 的名称，不要带扩展名
-    :param target: 项目主目录的的 path 字符串或者 Path 对象，也可以是 tcp://127.0.0.1:8334 这样的地址
-    :param type_: stream/file/zmq/pyzog 若使用 pyzog ，则调用 get_pyzog_handler，fmt 参数必须为 config_dict
-    :param fmt: text/json/config_dict 如果 type_ 参数为 pyzog，则必须为 config_dict
-    :param level: log 的 level 级别
+    :param target: 项目主目录的的 path 字符串或者 Path 对象，
+        也可以是 tcp://127.0.0.1:8334 这样的地址
+    :param type_: stream/file/zmq/pyzog 若使用 pyzog ，
+        则调用 get_pyzog_handler，fmt 参数必须为 config_dict
+    :param fmt: ``text/json/config_dict``
+        如果 ``type_`` 参数为 pyzog，则必须为 ``config_dict``
+    :param level: logging 的 level 级别
     :return: 一个 Logger 对象
-    :rtype: log.Logger
     """
     hdr = None
     if type_ == 'pyzog':
@@ -203,7 +205,7 @@ def get_logger(name, target, type_='file', fmt='text', level=log.INFO):
             raise ValueError('pyzog need a config_dict!')
         hdr = get_pyzog_handler(name, fmt, target, level)
     else:
-        hdr = get_log_handler(type_, fmt, level, target, name)
+        hdr = get_logging_handler(type_, fmt, level, target, name)
 
     log_ = log.getLogger(name)
     log_.addHandler(hdr)

@@ -52,19 +52,22 @@ pyape 支持 python3.9 及以上版本。
 
 进入虚拟环境，执行初始化命令，在项目文件夹下生成 4 个文件： ``README.md/wsgi.py/pyape.toml/.gitignore``。
 
-亦可以用 ``-C`` 参数指定项目文件夹。详情见 :ref:`pyape_init`。
+亦可以用 ``-C`` 参数指定项目文件夹。详情见 :ref:`cli_pyape_init`。
 
 ::
 
     (venv) cd project
     (venv) pyape init
 
-这里创建的是一个最小空项目，需要在这个项目的基础上进行进一步开发。开发遵循 Flask 程序的标准。
+.. note::
+
+    这里创建的是一个空项目，需要在这个项目的基础上进行进一步开发。开发遵循 Flask 程序的标准。
 
 进一步阅读：
 
 - 配置 :ref:`wsgi_py` 作为项目入口；
-- 对 :ref:`pyape_toml` 进行详细配置。
+- 对 :ref:`pyape_toml` 进行详细配置；
+- 阅读 :doc:`development` 文档。
 
 部署项目
 -------------

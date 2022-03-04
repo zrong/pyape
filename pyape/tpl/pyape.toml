@@ -74,15 +74,15 @@ cwd = '{DEPLOY_DIR}'
 
 # .env 基本配置文件内容，保存 FLASK 运行需要的配置，以及 flask.config 中的配置
 ['.env']
-FLASK_APP = 'wsgi:pyape_app'
+FLASK_APP = 'wsgi:{NAME}_app'
 FLASK_ENV = 'production'
 FLASK_RUN_PORT = 5000
 
 
 # gunicorn.conf.py 的基本配置文件内容，可在 env 中进行覆盖
 ['gunicorn.conf.py']
-wsgi_app = 'wsgi:pyape_app'
-proc_name = 'sagi-oidc'
+wsgi_app = 'wsgi:{NAME}_app'
+proc_name = '{NAME}'
 bind = '127.0.0.1:5001'
 umask = 0
 daemon = true
@@ -209,7 +209,7 @@ r = 2000
 # 不要写成 ENV.prod.deploy_dir = .... 
 # 解析器的 bug 会导致将 ENV.prod.deploy_dir 增加到 [[ENV.local.'config.toml'.REGIONALS]] 内部
 [ENV.prod]
-deploy_dir = '/srv/app/{NAME}_prod'
+DEPLOY_DIR = '/srv/app/{NAME}_prod'
 
 [ENV.prod.'uwsgi.ini']
 processes = 4
@@ -217,7 +217,7 @@ processes = 4
 [ENV.prod.'config.toml'.SQLALCHEMY]
 URI = 'sqlite:///{DEPLOY_DIR}/pyape.sqlite'
 
-[ENV.prod.'gunicory.conf.py']
+[ENV.prod.'gunicorn.conf.py']
 bind = 'unix:{DEPLOY_DIR}/gunicorn.sock'
 pidfile = '{DEPLOY_DIR}/gunicorn.pid'
 accesslog = '{DEPLOY_DIR}/logs/access.log'
