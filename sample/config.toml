@@ -1,0 +1,18 @@
+[FLASK]
+SECRET_KEY = "HK-VHH4C0ijLjOYBYrO7L2ACsmxcx9UClph-Q8lu3Hk="
+
+[SQLALCHEMY]
+URI = "sqlite:///sample/sample.sqlite"
+
+[PATH]
+STATIC_URL_PATH = "/static"
+STATIC_FOLDER = "dist"
+TEMPLATE_FOLDER = "dist/template"
+
+[SQLALCHEMY.ENGINE_OPTIONS]
+pool_timeout = 10
+pool_recycle = 3600
+
+[PATH.modules]
+main = ""
+user = "/user"

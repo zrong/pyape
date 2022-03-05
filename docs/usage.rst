@@ -28,6 +28,8 @@ pyape 支持 python3.9 及以上版本。
 
     pip install pyape
     
+    
+.. _create_project:
 
 创建项目
 ----------------
@@ -65,6 +67,7 @@ pyape 支持 python3.9 及以上版本。
 
 进一步阅读：
 
+- 进一步完善项目，请阅读： :ref:`sample_app`；
 - 配置 :ref:`wsgi_py` 作为项目入口；
 - 对 :ref:`pyape_toml` 进行详细配置；
 - 阅读 :doc:`development` 文档。
@@ -108,3 +111,24 @@ dar = Deploy And Reload
 ::
 
     (venv) pyape dar --env prod --server gunicorn
+
+
+.. _gen_secret_key:
+
+生成 SECRET_KEY
+--------------------
+
+``SECRET_KEY`` 是 Flask 程序必须包含的配置。
+使用 :ref:`cli_pyape_gen` 命令可以生成一个标准的 ``SECRET_KEY``。
+
+不带参数执行命令，可以生成 ``secret-key``： ::
+
+    pyape gen
+    {'secret-key': 'HK-VHH4C0ijLjOYBYrO7L2ACsmxcx9UClph-Q8lu3Hk=', 'nonce': 'ZmtcOPhm'}
+
+生成后，将 ``secret-key`` 的值设置为环境变量。
+如果项目名称为 ``sample``，开发环境为 ``local``，那么应该设置环境变量 ``SAMPLE_LOCAL_SECRET_KEY``： ::
+
+    export SAMPLE_LOCAL_SECRET_KEY='HK-VHH4C0ijLjOYBYrO7L2ACsmxcx9UClph-Q8lu3Hk='
+
+阅读 :ref:`pyape_toml_substitution` 了解 pyape 的环境变量替换机制。

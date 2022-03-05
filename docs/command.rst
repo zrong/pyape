@@ -164,3 +164,20 @@ pyape reload
       -C, --cwd DIRECTORY  工作文件夹。
       -E, --env TEXT       输入支持的环境名称。  [required]
       --help               Show this message and exit.
+
+.. _cli_pyape_gen:
+
+pyape gen
+---------------
+
+::
+
+  Usage: pyape gen [OPTIONS] [NAME]...
+
+    「本地」生成器，生成一个 Flask 可用的 SECRET_KEY，一个 NONCE 字符串，和一个加盐密码。
+
+  Options:
+    -C, --cwd DIRECTORY  工作文件夹，也就是复制目标文件夹。
+    --password TEXT      返回加盐之后的 PASSWORD，需要提供密码，同时在 NAME 参数中提供一个盐值。
+    --nonce INTEGER      返回一个 nonce 字符串。  [default: 8]
+    --help               Show this message and exit.

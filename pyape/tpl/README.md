@@ -1,3 +1,7 @@
-请使用 pyape --help 查看可用命令。
+# Document for pyape (In Chinese)
 
-中文说明： <https://blog.zengrong.net/pyape/>
+https://pyape.readthedocs.io/
+
+# Source for pyape
+
+https://github.com/zrong/pyape
