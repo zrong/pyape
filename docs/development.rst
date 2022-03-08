@@ -6,6 +6,20 @@
 一个最小化的 app
 ---------------------------
 
+下面的工作完成后，项目文件夹结构将如下所示： ::
+
+    sample
+    ├── app
+    │   ├── __init__.py
+    │   ├── main.py
+    │   └── user.py
+    ├── config.toml
+    ├── .gitignore
+    ├── .env
+    ├── pyape.toml
+    └── wsgi.py
+
+
 使用 :ref:`cli_pyape_init` 创建项目后，我们需要给项目增加内容使其可以工作。
 下面以创建一个在本地调试的 app 为例，描述项目搭建过程。
 
