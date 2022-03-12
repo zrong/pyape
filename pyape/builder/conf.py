@@ -171,7 +171,7 @@ class ConfigReplacer(object):
         # 替换 {NAME} 和 {WORK_DIR}
         replace_obj = {
             'NAME': self.pyape_name,
-            'WORK_DIR': self.work_dir.as_posix(),
+            'WORK_DIR': self.work_dir.resolve().as_posix(),
         }
         # 增加 {DEPLOY_DIR} 的值进行替换
         if isinstance(self.deploy_dir, Path):

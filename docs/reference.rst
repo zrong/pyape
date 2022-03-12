@@ -4,7 +4,18 @@
 .. automodule:: pyape.config
     :members:
 
+
+.. _pyape.db:
 .. automodule:: pyape.db
+
+.. currentmodule: pyape.db
+.. _pyape.db.DBManager:
+.. autoclass:: DBManager 
+    :members:
+
+
+.. _pyape.db.SQLAlchemy:
+.. autoclass:: SQLAlchemy
     :members:
 
 .. automodule:: pyape.app

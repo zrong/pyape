@@ -2,11 +2,12 @@
 pyape.util.func
 ~~~~~~~~~~~~~~~~~~~
 
-工具类，依赖 config
-放置和请求完全无关的，不依赖任何 flask 框架内容的工具
-这个类应该可以被其它模块导入而不发生冲突
+工具类，可独立使用。
+放置和请求完全无关的，不依赖任何 flask 框架内容的工具。
+这个类中的方法可以被其它模块导入而不发生冲突。
 """
 
+from typing import Union
 from datetime import datetime, timedelta, date, time as time2
 import re
 import json
@@ -50,11 +51,12 @@ def parse_float(value, default_value=None):
     return default_value
 
 
-def parse_date(value, default_value=None, to_day_end=False):
-    """ 解析一个日期字符串
+def parse_date(value, default_value=None, to_day_end=False) -> datetime:
+    """ 将一个日期字符串解析成为 datetime 对象。
+
     :param value:
     :param default_value:
-    :param to_day_end:  值为True 则自动加上23小时59分59秒999999微秒（当天的最后时刻），用来判断包含关系
+    :param to_day_end:  值为True 则自动加上23小时59分59秒999999微秒（当天的最后时刻），用来判断包含关系。
     :return:
     """
     if value is None:
@@ -70,8 +72,8 @@ def parse_date(value, default_value=None, to_day_end=False):
     return value
 
 
-def between_date(from_date, to_date):
-    """ 传递一个 from_date 和 一个 to_date，返回中间所有的 date（包括 from_date 和 to_date）
+def between_date(from_date, to_date) -> list[date]:
+    """ 传递一个 from_date 和 一个 to_date，返回中间所有的 date（包括 from_date 和 to_date）。
     """
     fd = date(from_date.year, from_date.month, from_date.day)
     td = date(to_date.year, to_date.month, to_date.day)
@@ -106,12 +108,12 @@ def strptime(timestr):
     return time2(dt.hour, dt.minute, dt.second)
 
 
-def in_time_range(timestart, timeend, dt=None):
+def in_time_range(timestart: Union[str, time2], timeend: Union[str, time2], dt: datetime=None) -> bool:
     """ 判断给定的时间 dt 是否在两个时间中间。
-    :param timestart: 开始的时间，支持字符串和 time 对象，字符串使用本模块中的 strptime 解析
-    :param timeend: 结束的时间，支持字符串和 time 对象，字符串使用本模块中的 strptime 解析
-    :param dt: 给定的 datetime 对象，如果不提供则使用 datetime.now()
-    :return: boolean
+
+    :param timestart: 开始的时间，支持字符串和 time 对象，字符串使用本模块中的 strptime 解析。
+    :param timeend: 结束的时间，支持字符串和 time 对象，字符串使用本模块中的 strptime 解析。
+    :param dt: 给定的 datetime 对象，如果不提供则使用 ``datetime.now()``。
     """
     if isinstance(timestart, str):
         timestart = strptime(timestart)
@@ -127,10 +129,10 @@ def in_time_range(timestart, timeend, dt=None):
     return dt > dtstart and dt < dtend
 
 
-def next_month_dt(day=None):
-    """ 返回下一个月的 datetime 对象
+def next_month_dt(day: datetime=None) -> datetime:
+    """ 返回下一个月的 datetime 对象。
+
     :param day: 基准 datetime 对象
-    :return:
     """
     if day is None:
         day = date.today()
@@ -143,10 +145,10 @@ def next_month_dt(day=None):
     return datetime(y, m, 1)
 
 
-def last_month_dt(day=None):
-    """ 返回上个月的 datetime 对象
-    :param day: 基准 datetime 对象
-    :return:
+def last_month_dt(day: datetime=None) -> datetime:
+    """ 返回上个月的 datetime 对象。
+
+    :param day: 基准 datetime 对象。
     """
     if day is None:
         day = date.today()
@@ -160,11 +162,14 @@ def last_month_dt(day=None):
     return datetime(y, m, 1)
 
 
-def daydt(day=None, default_initday=False, first_day_of_month=False):
-    """ 获取一个hour为0的日期
-    :param day: 时间戳或者基准 date/datetime 对象
-    :param default_initday: 仅当 day 参数为 None 的时候有效，True 代表使用初始日期，否则使用今天
-    :param first_day_of_month: 值为 True 则返回提供的 day 所在月的第一天
+def daydt(day: Union[date, datetime]=None,
+    default_initday: bool=False,
+    first_day_of_month: bool=False) -> datetime:
+    """ 获取一个hour为0的日期。
+
+    :param day: 时间戳或者基准 date/datetime 对象。
+    :param default_initday: 仅当 day 参数为 None 的时候有效，True 代表使用初始日期，否则使用今天。
+    :param first_day_of_month: 值为 True 则返回提供的 day 所在月的第一天。
     :return:
     """
     if not day:
@@ -177,10 +182,10 @@ def daydt(day=None, default_initday=False, first_day_of_month=False):
     return datetime(day.year, day.month, 1 if first_day_of_month else day.day)
 
 
-def get_cur_and_next_month(day=None):
-    """ 获取代表本月到下月的日期对象
-    :param day: 一个 datetime 对象，基于这个对象作为基准来创建 cur_month
-    :return:
+def get_cur_and_next_month(day: datetime=None):
+    """ 获取代表本月到下月的日期对象。
+
+    :param day: 一个 datetime 对象，基于这个对象作为基准来创建 cur_month。
     """
     # 如果不传递则使用今天作为基准
     if day is None:
@@ -196,20 +201,21 @@ def _json_datetime_handler(x):
     raise TypeError("Unknown type")
 
 
-def jsondumps(obj):
-    """ dump 一个 json 字符串，处理 datetime
-    :param obj:
-    :return:
+def jsondumps(obj) -> str:
+    """ dump 一个 json 字符串，处理 datetime。
+
+    :param obj: 需要被 dump 的对象。
     """
     return json.dumps(obj, default=_json_datetime_handler)
 
+
 PVER_RE = re.compile(r'([abr])\d+', re.I)
 
-def vername2code(vername):
-    """ 转换 vername 到 vercode
-    每个版本位允许3位
-    :param vername:
-    :return:
+
+def vername2code(vername) -> int:
+    """ 转换 vername 到 vercode，每个版本位允许3位。
+
+    :param vername: 形如 ``3.1.455`` 的版本号。
     """
     try:
         verlist = vername.split('.')

@@ -247,5 +247,28 @@ wsgi.py 加加强版
 
     pyape_app: PyapeFlask = pyape.app.init(gconfig, create_app, cls_config={'ResponseClass': CustomResponse})
     
+.. _sqlalchemy:
+
 使用 SQLAlchemy 操作数据库
 --------------------------------
+
+在使用 :ref:`wsgi_py` 初始化框架的时候，数据库会自动创建。可以在 ``pyape.app.init_db`` 中找到创建代码：
+
+.. code-block:: python
+
+    def init_db(pyape_app: PyapeFlask):
+    """ 初始化 SQLAlchemy
+    """
+    sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
+    if sql_uri is None:
+        return
+    global gdb
+    if gdb is not None:
+        raise ValueError('gdb 不能重复定义！')
+    gdb = PyapeDB(app=pyape_app)
+    pyape_app._gdb = gdb
+
+.. note::
+
+    ``pyape.flask_extend.PyapeDB`` 是 :ref:`pyape.db.SQLAlchemy <pyape.db.SQLAlchemy>` 的子类。
+

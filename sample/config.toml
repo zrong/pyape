@@ -2,7 +2,7 @@
 SECRET_KEY = "HK-VHH4C0ijLjOYBYrO7L2ACsmxcx9UClph-Q8lu3Hk="
 
 [SQLALCHEMY]
-URI = "sqlite:///sample/sample.sqlite"
+URI = "sqlite:////Users/zrong/storage/zrong/pyape/sample/sample.sqlite"
 
 [PATH]
 STATIC_URL_PATH = "/static"

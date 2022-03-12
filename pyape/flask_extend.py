@@ -2,7 +2,7 @@
 pyape.flask_extend
 ----------------------
 
-对 Flask 框架进行扩展
+对 Flask 框架进行扩展。
 """
 from typing import Callable
 from datetime import datetime
@@ -19,7 +19,7 @@ from pyape.db import SQLAlchemy
 
 
 class FlaskConfig(object):
-    """ flask.config.from_object 不支持 dict，因此建立这个 class
+    """ flask.config.from_object 不支持 dict，因此建立这个 class。
     """
     # ALLOWED_EXTENSIONS = set([])
     BOOTSTRAP_SERVE_LOCAL = True
@@ -42,7 +42,7 @@ class FlaskConfig(object):
 
 
 class PyapeResponse(Response):
-    """ 自定义的响应，为所有的响应头加入跨域信息 """
+    """ 自定义的响应，为所有的响应头加入跨域信息。 """
 
     # 默认的跨域数据
     # https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS
@@ -75,7 +75,9 @@ class PyapeResponse(Response):
     @property
     def cors_config(self):
         """ 子类覆盖该方法，实现跨域
+
         例如：
+
         >>> @property
         >>> def cros_config(self):
         >>>    return PyapeResponse.CORS_DEFAULT
@@ -91,7 +93,6 @@ class PyapeFlask(Flask):
         super().__init__(*args, **kwargs)
 
     def log_exception(self, exc_info):
-        """...description omitted..."""
         self.logger.error('%s', dict(
                 method=request.method,
                 path=request.path,
@@ -105,7 +106,7 @@ class PyapeFlask(Flask):
         
 
 class PyapeDB(SQLAlchemy):
-    """ 封装 pyape 必须的数据库方法"""
+    """ 封装 pyape 使用的数据库方法。"""
     _gconf: GlobalConfig = None
     _app: PyapeFlask = None
 
@@ -141,22 +142,23 @@ class PyapeDB(SQLAlchemy):
         )
 
     def __get_dynamic_table_key(self, table_name: str, bind_key: str) -> str:
-        """ 获取一个用于存储动态生成的 table class 的键名
-        键名是采用 bind_key 和 table_name 拼接而成
-        但 bind_key 会有 None 值的情况，将 None 值转换成为空字符串
+        """ 获取一个用于存储动态生成的 table class 的键名。
+        键名是采用 bind_key 和 table_name 拼接而成，
+        但 bind_key 会有 None 值的情况，将 None 值转换成为空字符串。
         """
         bind_prefix: str = bind_key or ''
         return f'{bind_prefix}_{table_name}'
         
     def get_dynamic_table(self, table_name: str, bind_key: str=None):
-        """ 获取动态表"""
+        """ 获取动态表。"""
         return self.__dynamic_table_cls.get(self.__get_dynamic_table_key(table_name, bind_key))
 
     def set_dynamic_table(self, build_table_method: Callable, table_name: str, bind_key: str=None):
         """ 获取动态表
 
         :param table: 已经创建好的 table_cls
-        :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class，参见 pyape.app.models.valueobject.make_value_object_table_cls
+        :param build_table_method: 创建表的方法，接受两个参数，
+            动态创建一个 Table Class，参见 ``pyape.app.models.valueobject.make_value_object_table_cls``。
         """
         key_name: str = self.__get_dynamic_table_key(table_name, bind_key)
         table = self.get_dynamic_table(table_name, bind_key)
@@ -167,11 +169,11 @@ class PyapeDB(SQLAlchemy):
         return table
 
     def build_regional_tables(self, name: str, build_table_method, rconfig: RegionalConfig):
-        """ 根据 regionals 的配置创建多个表
+        """ 根据 regionals 的配置创建多个表。
 
-        :param name: 表的名称前缀
-        :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class
-        :param rconfig: RegionalConfig 的实例
+        :param name: 表的名称前缀。
+        :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class。
+        :param rconfig: ``RegionalConfig`` 的实例。
         """
         tables = self.__regional_table_cls.get(name)
         if tables is None:
@@ -191,11 +193,11 @@ class PyapeDB(SQLAlchemy):
         # logger.info('build_regional_tables %s', tables)
 
     def get_regional_table(self, name: str, r: int, build_table_method, rconfig: RegionalConfig):
-        """ 根据 regionals 和表名称前缀获取一个动态创建的表
+        """ 根据 regionals 和表名称前缀获取一个动态创建的表。
 
-        :param name: 表的名称前缀
-        :param r: regional
-        :param rconfig: RegionalConfig 的实例
+        :param name: 表的名称前缀。
+        :param r: regional。
+        :param rconfig: ``RegionalConfig`` 的实例。
         """
         if not r in rconfig.rids:
             raise ValueError('get_regional_table: No regional %s' % r)
@@ -211,15 +213,14 @@ class PyapeDB(SQLAlchemy):
         # logger.info('get_regional_table %s', Cls)
         return Cls
 
-    def result2dict(self, result, keys, replaceobj=None, replaceobj_key_only=False):
-        """ 根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict
+    def result2dict(self, result, keys, replaceobj=None, replaceobj_key_only=False) -> dict:
+        """ 根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict。
 
-        :param result: 要转换的对象
-        :param keys: 要转换对象的key list
-        :param replaceobj: 可替换的键
-        :param replaceobj_key_only: 仅包含可替换的键
-        :return: 转换成功的 dict
-        :rtype: dict
+        :param result: 要转换的对象。
+        :param keys: 要转换对象的key list。
+        :param replaceobj: 可替换的键。
+        :param replaceobj_key_only: 仅包含可替换的键。
+        :return: 转换成功的 dict。
         """
         rst = {}
         for key in keys:
@@ -242,11 +243,11 @@ class PyapeDB(SQLAlchemy):
 
     def to_response_data(self, result, replaceobj=None, replaceobj_key_only=False, bind_key: str=None):
         # zrong 2017-08-31
-        """ 把数据库查询出来的 ResultProxy 转换成 dict 或者 list
-        仅支持 list 和 dict 类型，且不支持嵌套（dict 中的值不能包含 ResultProxy 对象）
+        """ 把数据库查询出来的 ResultProxy 转换成 dict 或者 list，
+        仅支持 list 和 dict 类型，且不支持嵌套（dict 中的值不能包含 ResultProxy 对象）。
 
-        :param replaceobj: 替换键名
-        :param replaceobj_key_only: 仅使用替换键名，丢掉非替换键名的键
+        :param replaceobj: 替换键名。
+        :param replaceobj_key_only: 仅使用替换键名，丢掉非替换键名的键。
         """
         if result is None:
             return {}
