@@ -7,13 +7,13 @@ pyape.db
 1. 解决 SQLAlchemy 线程问题
 2. 提供多数据库绑定支持
 """
-
 import math
+from threading import Lock
+
 from typing import Iterable, Union
-from xmlrpc.client import boolean
 from sqlalchemy.schema import Table, MetaData
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session, Query
-from sqlalchemy.engine import Engine, create_engine
+from sqlalchemy.orm import DeclarativeMeta, declarative_base, sessionmaker, Session, scoped_session, Query
+from sqlalchemy.engine import Engine, create_engine, Result
 
 
 class Pagination(object):
@@ -148,28 +148,45 @@ class Pagination(object):
                 last = num
 
 
+class BindMetaMixin(type):
+    def __init__(cls, name: str, bases, d):
+        bind_key = (
+            d.pop('__bind_key__', None)
+            or getattr(cls, '__bind_key__', None)
+        )
+        super(BindMetaMixin, cls).__init__(name, bases, d)
+        if bind_key is not None and getattr(cls, '__table__', None) is not None:
+            cls.__table__.info['bind_key'] = bind_key
+
+
+class DefaultMeta(BindMetaMixin, DeclarativeMeta):
+    pass
+
+
 class DBManager(object):
-    """ 管理 SQL 连接，可单独使用，也可以结合 SQLAlchemy 使用
+    """ 管理 SQL 连接，创建和管理数据库 Engine，Session，Model
     
     :param URI: 提供数据库地址
     :param dict kwargs: 提供数据库连接参数
     """
     default_bind_key: str = None
     URI: Union[dict, str] = None
+    __engine_lock: Lock = Lock()
     # 保存 engines 对象
     __engines: dict = None
+    # 保存 sessionmaker 需要的 binds 参数
+    __binds: dict = None
     # 保存 Session 生成器
-    __session_factories: dict = None
+    __Session_Factory = None
     # 保存所有的 Model class
     __model_classes: dict = None
 
     def __init__(self, URI: Union[dict, str], **kwargs: dict) -> None:
         self.__engines = {}
-        self.__session_factories = {}
+        self.__binds = {}
         self.__model_classes = {}
         self.URI = URI
-        self.__set_default_uri()
-        self.__build_dbs()
+        self.__build_binds()
 
     @property
     def Models(self) -> Iterable:
@@ -179,27 +196,48 @@ class DBManager(object):
     def bind_keys(self) -> Iterable:
         return self.__model_classes.keys()
         
-    def __build_dbs(self) -> None:
+    def __build_binds(self) -> None:
         view = None
         if isinstance(self.URI, str):
             view = {None: self.URI}.items()
+            self.default_bind_key = None
         else:
             view = self.URI.items()
+            self.default_bind_key = list(self.URI.keys())[0]
+            
         # 下面的三个引擎只需要创建一遍，在初始化的时间创建
         for name, uri in view:
-            engine = create_engine(uri)
-            # 保存 engine
-            self.__engines[name] = engine
-            # 保存 session factory
-            self.__session_factories[name] = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-            # 保存 Model class
-            Model = declarative_base(name=name or 'Model')
-            Model.bind_key = name
-            self.__model_classes[name] = Model
+            self.__add_bind(name, uri)
+
+        self.__Session_Factory = sessionmaker(
+            binds=self.__binds,
+            autoflush=False,
+            future=True
+        )
         
-    def __set_default_uri(self) -> None:
-        if isinstance(self.URI, dict):
-            self.default_bind_key = self.URI.keys()[0]
+    def __add_bind(self, bind_key: str, uri: str) -> bool:
+        Model = self.set_Model(bind_key)
+        if self.__binds.get(Model) is None:
+            engine = self.__set_engine(bind_key, uri)
+            self.__binds[Model] = engine
+            return True
+        return False
+        
+    def __set_engine(self, bind_key: str, uri: str) -> None:
+        engine = create_engine(uri, future=True)
+        # 保存 engine
+        self.__engines[bind_key] = engine
+        return engine
+
+    def set_bind(self, bind_key: str, uri: str):
+        succ = self.__add_bind(bind_key, uri)
+        # 因为增加了 bind，所以也要同时更新 __Session_Factory，
+        # 以便新创建的 Session 实例包含新的 bind
+        # 对于已经创建的实例，需要调用 Session.bind_mapper 进行绑定
+        if succ:
+            self.__Session_Factory.configure(binds=self.__binds)
+            return
+        raise KeyError(f'bind_key {bind_key} is duplicated!')
 
     def get_Model(self, bind_key: str=None):
         return self.__model_classes.get(bind_key or self.default_bind_key)
@@ -211,56 +249,58 @@ class DBManager(object):
         """
         if self.__model_classes.get(bind_key):
             raise KeyError(bind_key)
-        self.__model_classes[bind_key] = declarative_base(name=bind_key or 'Model')
-        return self.__model_classes.get(bind_key or self.default_bind_key)
+
+        Model = declarative_base(name=bind_key or 'Model', metaclass=DefaultMeta)
+        Model.bind_key = bind_key
+        self.__model_classes[bind_key] = Model
+        return Model
         
     def get_engine(self, bind_key: str=None) -> Engine:
         return self.__engines.get(bind_key or self.default_bind_key)
-    
-    def create_sessions(self, is_scoped: bool=False) -> dict[Session]:
-        """ 根据 URI 的定义创建所有需要的 session 实例"""
-        sessions: dict[Session] = {}
-        for bind_key, SF in self.__session_factories.items():
-            if is_scoped:
-                sessions[bind_key] = self.create_scoped_session(bind_key)
-            else:
-                sessions[bind_key] = self.create_session(bind_key)
-        return sessions
-    
-    def create_session(self, bind_key: str=None) -> Session:
-        """ 创建一个 session 实例"""
-        SF = self.__session_factories.get(bind_key or self.default_bind_key)
-        return SF()
 
-    def create_scoped_session(self, bind_key: str=None, in_flask: bool=False) -> Session:
+    def create_session(self) -> Session:
+        return self.__Session_Factory()
+
+    def create_scoped_session(self, in_flask: bool=False) -> Session:
         """ 创建一个 scoped session 实例"""
-        SF = self.__session_factories.get(bind_key or self.default_bind_key)
         if in_flask:
             import flask
-            return scoped_session(SF, scopefunc=flask._app_ctx_stack.__ident_func__)
-        return scoped_session(SF)
+            return scoped_session(self.__Session_Factory, scopefunc=flask._app_ctx_stack.__ident_func__)
+        return scoped_session(self.__Session_Factory)
         
 
 class SQLAlchemy(object):
-    """ 创建一个用 sqlalchemy 管理数据库的对象
+    """ 创建一个用 sqlalchemy 管理数据库的对象。
+    封装常用的高级功能，例如 table 和 query 操作。
 
-    :param dbm: DBManager 的实例
-    :param URI: 若不提供 dbm 则使用 URI 数据新建 DBManager
-    :param is_scoped: 为了现成安全，使用 scoped session。
-    :param in_flask: 是否在 Flask 框架内部。在 Flask内 内部使用。创建 Session 实例的时候会使用 scoped_session。
+    :param dbm: DBManager 的实例。
+    :param URI: 若不提供 dbm 则使用 URI 数据新建 DBManager。
+    :param is_scoped: 为线程安全，使用 scoped session。
+    :param in_flask: 是否在 Flask 框架内部。若在 Flask 内部使用，创建 Session 实例的时候会使用 scoped_session。
     """
     dbm: DBManager = None
     is_scoped: bool = True
     in_flask: bool = True
+    __session: Session = None
 
-    def __init__(self, dbm: DBManager=None, URI: dict=None, is_scoped: bool=True, in_flask: bool=False, **kwargs: dict) -> None:
+    def __init__(self,
+        dbm: DBManager=None,
+        URI: dict=None,
+        is_scoped: bool=True,
+        in_flask: bool=False,
+        **kwargs: dict) -> None:
+
         if dbm is None:
             dbm = DBManager(URI, **kwargs)
         self.dbm = dbm
         self.in_flask = in_flask
         # 若 in_flask 为真，则 is_scoped 一定为真
         self.is_scoped = True if in_flask else is_scoped
-        self.__sessions = self.dbm.create_sessions(is_scoped=is_scoped)
+        self.__session = self.__build_session()
+
+    def __build_session(self) -> Session:
+        return self.dbm.create_scoped_session(self.in_flask) \
+            if self.is_scoped else self.dbm.create_session() 
 
     def Model(self, bind_key: str=None):
         """ 获取对应的 Model Factory class
@@ -273,19 +313,19 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
-    def session(self, bind_key: str=None, create_new: bool=False) -> Session:
+    def session(self, create_new: bool=False) -> Session:
         """ 获取对应的 session 实例
         :param create_new: 使用独立的 session 实例
         """
         if create_new:
-            return self.dbm.create_scoped_session(bind_key, self.in_flask) if self.is_scoped else self.dbm.create_session(bind_key) 
-        return self.__sessions[bind_key]
+            return self.__build_session()
+        return self.__session
 
     def query(self, model_cls) -> Query:
         """ 获取一个 Query 对象
-        :param model_cls: 一个 Model对象，该对象在创建的时候一定有定义 bind_key。
+        :param model_cls: 一个 Model对象
         """
-        return self.session(model_cls.bind_key).query(model_cls)
+        return self.session().query(model_cls)
         
     def metadata(self, bind_key: str=None) -> MetaData:
         """ 获取对应 Model 的 metadata 实例
@@ -334,29 +374,11 @@ class SQLAlchemy(object):
     def get_table(self, name: str, bind_key: str=None) -> Table:
         return self.metadata(bind_key).tables[name]
 
-    def execute(self, sql, use_session: bool=False, bind_key: str=None):
+    def execute(self, sql, use_session: bool=False, bind_key: str=None) -> Result:
         # 使用下面的语法会报错 sqlite3.ProgrammingError: Cannot operate on a closed database.
         # with engine.connect() as connection:
         #     return connection.execute(sql)
+        result: Result = None
         if use_session:
-            return self.session(bind_key).execute(sql)
+            return self.session().execute(sql)
         return self.engine(bind_key).connect().execute(sql)
-    
-    def sall(self, sql, one_entity: bool=True, bind_key: str=None) -> list:
-        """ 基于 session 获取所有数据
-        :param is_entity: 若为实体，则需要取第一项 https://docs.sqlalchemy.org/en/14/tutorial/data_select.html
-        """
-        rows = self.execute(sql, use_session=True, bind_key=bind_key).fetchall()
-        if one_entity:
-            return [item[0] for item in rows]
-        return rows
-
-    def sone(self, sql, one_entity: bool=True, bind_key: str=None) -> list:
-        """ 基于 session 获取一条数据
-        :param is_entity: 若为实体，则需要取第一项 https://docs.sqlalchemy.org/en/14/tutorial/data_select.html
-        """
-        row = self.execute(sql, use_session=True, bind_key=bind_key).fetchone()
-        if one_entity:
-            return row[0]
-        return row
-    

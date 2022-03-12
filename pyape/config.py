@@ -138,15 +138,16 @@ class GlobalConfig(object):
     cfg_data = None
     regional = None
 
-    def __init__(self, work_dir: Path=None, cfg_file: str='config.toml'):
+    def __init__(self, work_dir: Path=None, cfg: Union[dict, str]='config.toml'):
         """ 初始化全局文件
         :param Path work_dir: 工作文件夹
-        :param str cfg_file:  相对于工作文件夹的配置文件地址
+        :param str|dict cfg: 相对于工作文件夹的配置文件地址，或者配置内容本身
         """
         self.__work_dir = work_dir
-        if cfg_file:
-            self.cfg_data = self.read(cfg_file, throw_error=True)
-        # self.cfg_data 可能是个 {}
+        if isinstance(cfg, dict):
+            self.cfg_data = cfg
+        else:
+            self.cfg_data = self.read(cfg, throw_error=True)
         if self.cfg_data:
             self.init_regionals(data=self.cfg_data)
 

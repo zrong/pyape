@@ -1,5 +1,5 @@
 flask>=2.0.2
-sqlalchemy>=1.4.31
+sqlalchemy>=1.4.32
 wheel
 flask-compress
 PyMySQL

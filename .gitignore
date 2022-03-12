@@ -111,3 +111,4 @@ venv.bak/
 !.readthedocs.yaml
 /logs
 /*.json
+*.sqlite
