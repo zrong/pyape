@@ -16,9 +16,7 @@
 ``__bind_key__`` 这个巧妙的方式来让不同的 Table 绑定到不同的数据库。
 而我认为直接使用多个 Model，在定义 Table 的时候通过 Model 来区分，更容易理解。
 
-我们来看看 `Flask-SQLAlchemy` 的做法：
-
-Flask-SQLAlchemy 对 Metadata 做了一些手脚，自动加入 `__bind_key__` 属性。
+``Flask-SQLAlchemy`` 对 Metadata 做了一些手脚，自动加入 ``__bind_key__`` 属性。
 
 .. code-block:: python
 
@@ -58,7 +56,7 @@ Flask-SQLAlchemy 对 Metadata 做了一些手脚，自动加入 `__bind_key__` �
                 return state.db.get_engine(self.app, bind=bind_key)
         return SessionBase.get_bind(self, mapper, clause)
 
-pyape 采用了另一种方法。下面截取 :ref:`pyape.db.DBManager <pyape_db_dbmanager>` 的一部分代码来说明：
+pyape 采用了另一种方法。下面截取 :ref:`pyape.db.DBManager <pyape.db.DBManager>` 的一部分代码来说明：
 
 .. code-block:: python
 
