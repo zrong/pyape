@@ -4,7 +4,6 @@
 .. automodule:: pyape.config
     :members:
 
-
 .. _pyape.db:
 .. automodule:: pyape.db
 
@@ -12,7 +11,6 @@
 .. _pyape.db.DBManager:
 .. autoclass:: DBManager 
     :members:
-
 
 .. _pyape.db.SQLAlchemy:
 .. autoclass:: SQLAlchemy

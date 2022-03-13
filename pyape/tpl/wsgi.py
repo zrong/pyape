@@ -50,4 +50,4 @@ def create_app(pyape_app: PyapeFlask):
 
 
 # gconfig 可以设置为 None，此时会使用 Path.cwd() 下的 config.toml 作为配置文件。
-pyape_app: PyapeFlask = pyape.app.init(gconfig, create_app, cls_config={'ResponseClass': CustomResponse})
+pyape_app: PyapeFlask = pyape.app.init(gconfig, create_app, create_args={'ResponseClass': CustomResponse})

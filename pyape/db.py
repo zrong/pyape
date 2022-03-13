@@ -214,7 +214,6 @@ class DBManager(object):
             view = self.URI.items()
             self.default_bind_key = list(self.URI.keys())[0]
             
-        # 下面的三个引擎只需要创建一遍，在初始化的时间创建
         for name, uri in view:
             self.__add_bind(name, uri)
 

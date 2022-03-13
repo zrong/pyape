@@ -85,7 +85,6 @@ TEMPLATE_FOLDER = 'dist/template'
 
 ['config.toml'.PATH.modules]
 main = '/sampleapi'
-user = '/sampleapi/user'
 
 #==============================================
 # 以下配置覆盖上面的配置
@@ -108,6 +107,23 @@ STATIC_URL_PATH = '/static'
 main = ''
 user = '/user'
 
+#--------------------- multidb 多数据库环境配置
+[ENV.multidb.'.env']
+FLASK_ENV = 'development'
+FLASK_RUN_PORT = 5001
+
+[ENV.multidb.'config.toml'.PATH]
+STATIC_URL_PATH = '/static'
+
+[ENV.multidb.'config.toml'.PATH.modules]
+main = ''
+user_multidb = '/user2'
+
+[ENV.multidb.'config.toml'.SQLALCHEMY.URI]
+# 多数据库配置，直接覆盖默认配置
+db1 = 'sqlite:///{WORK_DIR}/sample_db1.sqlite'
+db2 = 'sqlite:///{WORK_DIR}/sample_db2.sqlite'
+
 
 #--------------------- prod 环境的配置
 # 不要写成 ENV.prod.deploy_dir = .... 
@@ -117,6 +133,10 @@ DEPLOY_DIR = '/srv/app/{NAME}_prod'
 
 [ENV.prod.'uwsgi.ini']
 processes = 4
+
+[ENV.prod.'config.toml'.PATH.modules]
+main = ''
+user = '/sampleapi/user'
 
 [ENV.prod.'config.toml'.SQLALCHEMY]
 URI = 'sqlite:///{DEPLOY_DIR}/sample.sqlite'

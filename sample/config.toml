@@ -1,18 +1,19 @@
 [FLASK]
 SECRET_KEY = "HK-VHH4C0ijLjOYBYrO7L2ACsmxcx9UClph-Q8lu3Hk="
 
-[SQLALCHEMY]
-URI = "sqlite:////Users/zrong/storage/zrong/pyape/sample/sample.sqlite"
-
 [PATH]
 STATIC_URL_PATH = "/static"
 STATIC_FOLDER = "dist"
 TEMPLATE_FOLDER = "dist/template"
 
+[PATH.modules]
+main = ""
+user_multidb = "/user2"
+
+[SQLALCHEMY.URI]
+db1 = "sqlite:////Users/zrong/storage/zrong/pyape/sample/sample_db1.sqlite"
+db2 = "sqlite:////Users/zrong/storage/zrong/pyape/sample/sample_db2.sqlite"
+
 [SQLALCHEMY.ENGINE_OPTIONS]
 pool_timeout = 10
 pool_recycle = 3600
-
-[PATH.modules]
-main = ""
-user = "/user"

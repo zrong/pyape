@@ -41,7 +41,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 def init_db(pyape_app: PyapeFlask):
-    """ 初始化 SQLAlchemy
+    """ 初始化 SQLAlchemy 数据库支持。
     """
     sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
     if sql_uri is None:
@@ -93,7 +93,7 @@ def init_logger(pyape_app: PyapeFlask):
 
 
 def init_cache(pyape_app: PyapeFlask):
-    """ 初始化全局缓存对象
+    """ 初始化全局缓存对象。
     """
     global gcache
     if gcache is not None:
@@ -112,12 +112,12 @@ def init_cache(pyape_app: PyapeFlask):
     gcache = GlobalCache.from_config(ctype, flask_redis_client=flask_redis_client)
 
 
-def register_blueprint(pyape_app, rest_package, rest_package_names):
-    """ 注册 Blueprint，必须在 db 的创建之后调用
+def register_blueprint(pyape_app, rest_package, rest_package_names) -> None:
+    """ 注册 Blueprint，必须在 gdb 的创建之后调用。
+
     :param app: flask app 实例
     :param rest_package: 父包名
     :param rest_package_names: {name:url, name2:url2}
-    :return:
     """
     if rest_package is None:
         return
@@ -129,7 +129,7 @@ def register_blueprint(pyape_app, rest_package, rest_package_names):
 
 
 def _build_kwargs_for_app(gconf: GlobalConfig):
-    """ 将本地所有路径转换为绝对路径，以保证其在任何环境下可用
+    """ 将本地所有路径转换为绝对路径，以保证其在任何环境下可用。
     """
     kwargs = {
             'static_url_path': gconf.getcfg('PATH', 'STATIC_URL_PATH', default_value=''),
@@ -148,11 +148,22 @@ def _build_kwargs_for_app(gconf: GlobalConfig):
     return kwargs
 
 
-def create_app(gconf: GlobalConfig, FlaskClass=PyapeFlask, ResponseClass=PyapeResponse, ConfigClass=FlaskConfig):
+def create_app(
+        gconf: GlobalConfig,
+        FlaskClass=PyapeFlask,
+        ResponseClass=PyapeResponse,
+        ConfigClass=FlaskConfig,
+        error_handler: bool=False,
+    ):
     """
-    根据不同的配置创建 app
-    :param config_name:
-    :return:
+    根据不同的配置创建 app。
+
+    :param gconf: ``GlobalConfig`` 的实例。
+    :param FlaskClass: Flask 的子类。
+    :param ResponseClass: Flask Response 的子类。
+    :param ConfigClass:  对 flask.config 进行包装。
+    :param error_handler: 是否启用 ``Flask.register_error_handler``
+        接管 HTTP STATUS_CODE 处理。使用 ``pyape.errors`` 来接管。
     """
     kwargs = _build_kwargs_for_app(gconf)
 
@@ -164,17 +175,18 @@ def create_app(gconf: GlobalConfig, FlaskClass=PyapeFlask, ResponseClass=PyapeRe
         compress = Compress()
         compress.init_app(pyape_app)
     # 处理全局错误
-    errors.init_app(pyape_app)
+    if error_handler:
+        errors.init_app(pyape_app)
     return pyape_app
 
 
-def _init_common(gconf: GlobalConfig=None, cls_config=None) -> PyapeFlask:
+def _init_common(gconf: GlobalConfig=None, create_args: dict=None) -> PyapeFlask:
     if gconf is None:
         gconf = GlobalConfig(Path.cwd())
     sys.modules[__name__].__dict__['gconfig'] = gconf
     flask.cli.load_dotenv()
 
-    pyape_app = create_app(gconf ,**cls_config) if isinstance(cls_config, dict) else create_app(gconf)
+    pyape_app = create_app(gconf ,**create_args) if isinstance(create_args, dict) else create_app(gconf)
 
     init_db(pyape_app)
     init_redis(pyape_app)
@@ -186,16 +198,16 @@ def _init_common(gconf: GlobalConfig=None, cls_config=None) -> PyapeFlask:
     return pyape_app
 
 
-def init(gconf: GlobalConfig=None, init_app_method=None, cls_config=None) -> PyapeFlask:
-    """ 初始化 APP
+def init(gconf: GlobalConfig=None, init_app_method=None, create_args: dict=None) -> PyapeFlask:
+    """ 初始化 APP。
 
-    :param gconf: pyape.config.GlobalConfig 的实例
-    :param init_app: 外部初始化方法
-    :param cls_config: 一个包含自定义 Class 的 dict
-        形如: ``{'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}``
-        不需要同时包含 3 个 Class
+    :param gconf: ``pyape.config.GlobalConfig`` 的实例。
+    :param init_app: 外部初始化方法。
+    :param create_args: 一个包含 create_app 除 gconf 之外所有参数的 dict。默认值为：
+        ``{'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig, 'error_handler: False}``。
+        提供的值会覆盖默认值。
     """
-    pyape_app = _init_common(gconf, cls_config)
+    pyape_app = _init_common(gconf, create_args)
 
     # 这个方法必须在注册蓝图前调用
     if init_app_method is not None:
@@ -207,16 +219,16 @@ def init(gconf: GlobalConfig=None, init_app_method=None, cls_config=None) -> Pya
     return pyape_app
 
 
-def init_decorator(gconf: GlobalConfig=None, cls_config=None):
-    """ 初始化 APP 的装饰器版本
+def init_decorator(gconf: GlobalConfig=None, create_args: dict=None):
+    """ 初始化 APP 的装饰器版本。
 
-    :param gconf: pyape.config.GlobalConfig 的实例
-    :param init_app: 外部初始化方法
-    :param cls_config: 一个包含自定义 Class 的 dict
-        形如: ``{'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig}``
-        不需要同时包含 3 个 Class
+    :param gconf: ``pyape.config.GlobalConfig`` 的实例。
+    :param init_app: 外部初始化方法。
+    :param create_args: 一个包含 create_app 除 gconf 之外所有参数的 dict。默认值为：
+        ``{'FlaskClass': PyapeFlask, 'ResponseClass': PyapeResponse, 'ConfigClass': FlaskConfig, 'error_handler: False}``。
+        提供的值会覆盖默认值。
     """
-    pyape_app = _init_common(gconf, cls_config)
+    pyape_app = _init_common(gconf, create_args)
 
     def decorator(f):
         @wraps(f)

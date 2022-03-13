@@ -8,6 +8,8 @@ pyape.logging
 """
 
 import logging as log
+from logging.handlers import WatchedFileHandler
+from logging import Handler, StreamHandler
 from pathlib import Path
 
 import zmq
@@ -21,7 +23,7 @@ TEXT_LOG_FORMAT = """
 JSON_LOG_FORMAT = r'%(levelname)s %(module)s %(funcName)s %(pathname)s %(lineno) %(threadName) %(processName) %(created) %(asctime) %(message)s'
 
 
-class ZeroMQHandler(log.Handler):
+class ZeroMQHandler(Handler):
     """基于 ZeroMQ 的 ROUTER-DEALER 模式来发布 log
 
     范例::
@@ -46,7 +48,7 @@ class ZeroMQHandler(log.Handler):
         :param context: 提供 ZeroMQ 的上下文
         :param socket_type: 提供 ZeroMQ 模式
         """
-        log.Handler.__init__(self)
+        Handler.__init__(self)
         if isinstance(interface_or_socket, zmq.Socket):
             self.socket = interface_or_socket
             self.ctx = self.socket.context
@@ -68,7 +70,7 @@ class ZeroMQHandler(log.Handler):
             self.handleError(record)
 
 
-class RedisHandler(log.Handler):
+class RedisHandler(Handler):
     """基于 Redis 的 publish 命令来发布 log
     """
     # redis 实例
@@ -78,7 +80,7 @@ class RedisHandler(log.Handler):
     channel = None
     
     def __init__(self, url, channel, **kwargs):
-        log.Handler.__init__(self)
+        Handler.__init__(self)
         self.channel = channel
         self.r = redis.from_url(url, **kwargs)
 
@@ -109,7 +111,7 @@ def _create_file_handler(target, filename, chmod=False):
     if not logfile.exists():
         logfile.touch()
     # 使用 WatchedFileHandler 在文件改变的时候自动打开新的流，配合 logrotate 使用
-    return log.handlers.WatchedFileHandler(logfile, encoding='utf8')
+    return WatchedFileHandler(logfile, encoding='utf8')
 
 
 def _create_zmq_handler(target):
@@ -155,7 +157,7 @@ def get_logging_handler(type_, fmt, level=log.INFO, target=None, name=None):
             raise TypeError('name is necessary if type is redis!')
         handler = _create_redis_handler(target, name)
     else:
-        handler = log.StreamHandler()
+        handler = StreamHandler()
     if fmt == 'raw':
         formatter = log.Formatter()
     elif fmt == 'text':

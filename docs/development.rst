@@ -27,6 +27,8 @@
 
 创建两个子模块 ``app/main.py`` 和 ``app/user.py``。
 
+.. _sample_app_main_py:
+
 ``main.py`` 的内容如下：
 
 .. code-block:: python
@@ -38,6 +40,8 @@
     @main.get('/')
     def home():
         return 'HELLO WORLD
+
+.. _sample_app_user_py:
 
 ``user.py`` 的内容如下：
 
@@ -259,16 +263,217 @@ wsgi.py 加加强版
     def init_db(pyape_app: PyapeFlask):
     """ 初始化 SQLAlchemy
     """
-    sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
-    if sql_uri is None:
-        return
-    global gdb
-    if gdb is not None:
-        raise ValueError('gdb 不能重复定义！')
-    gdb = PyapeDB(app=pyape_app)
-    pyape_app._gdb = gdb
+        sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
+        if sql_uri is None:
+            return
+        global gdb
+        if gdb is not None:
+            raise ValueError('gdb 不能重复定义！')
+        gdb = PyapeDB(app=pyape_app)
+        pyape_app._gdb = gdb
 
 .. note::
 
     ``pyape.flask_extend.PyapeDB`` 是 :ref:`pyape.db.SQLAlchemy <pyape.db.SQLAlchemy>` 的子类。
 
+
+pyape 默认使用 SQLAlchemy 的 ORM 模式工作。让我们构建一个 Model 用于创建 Table。
+
+.. _app_model_py:
+
+创建子模块 ``app/model.py`` 用于 Table 定义。
+
+.. code-block:: python
+
+    # app/model.py
+    import time
+    from sqlalchemy import Column, INT, VARCHAR
+    from pyape.app import gdb
+
+    Model = gdb.Model()
+
+    class User(Model):
+        __tablename__ = 'user'
+
+        id = Column(INT, autoincrement=True, primary_key=True)
+        name = Column(VARCHAR(100), nullable=False)
+        createtime = Column(INT, nullable=False, default=lambda: int(time.time()))
+
+
+在模块 :ref:`app/user.py <sample_app_user_py>` 中增加两个方法，用于读写数据库。
+
+.. note::
+
+    涉及到 webargs 用法，请参考其 `官方文档 <https://webargs.readthedocs.io/en/latest/>`_。
+
+    SQLAlchemy 语法基于最新的 SQLAlchemy 2.0，请阅读 `SQLAlchemy 2.0 Tutorial <https://docs.sqlalchemy.org/en/20/tutorial/index.html>`_。
+    若你是 SQLAlchemy 1.x 用户，请阅读 `Migrating to SQLAlchemy 2.0 <https://docs.sqlalchemy.org/en/20/changelog/migration_20.html>`_。
+
+.. code-block:: python
+
+    from flask import Blueprint, abort
+    from webargs.flaskparser import use_args
+    from webargs import fields
+
+    from pyape.app import gdb, logger
+    from app.model import User
+
+
+    @user.get('/get')
+    @use_args({'id': fields.Int(required=True)}, location='query')
+    def get_user(args):
+        id = args['id']
+        userobj = gdb.session().get(User, id)
+        if userobj is None:
+            logger.warning(f'user {id} is not found.')
+            abort(404)
+        return f'User id: {userobj.id}, name: {userobj.name}'
+
+
+    @user.post('/set')
+    @use_args({'id': fields.Int(required=True), 'name': fields.Str(required=True)}, location='form')
+    def set_user(args):
+        userobj = User(**args)
+        gdb.session().add(userobj)
+        gdb.session().commit()
+        return f'User id: {userobj.id}, name: {userobj.name}'
+
+.. _test_sample_local:
+
+测试 Sample 项目的 local 环境（单数据库支持）
+----------------------------------------------
+
+若 pyape 项目位于 ``~/storage/pyape``： ::
+
+    # 进入虚拟环境
+    cd ~/storage/pyape
+    python3 -m venv venv
+    source venv/bin/active
+
+    # 安装当前环境下的 pyape
+    (venv) pip install -e .
+
+    # 创建本地配置文件，使用 local 环境
+    (venv) pyape config -FE local config.toml .env
+
+    # 运行单元测试
+    (venv) pytest tests/test_sample_env_local.py
+
+.. _multi_db_sample:
+
+多数据库支持范例
+--------------------------------
+
+:ref:`sqlalchemy` 仅包含单数据库支持，得益于 SQLAlchemy 的良好设计
+以及 :ref:`pyape_toml` 的多环境支持，我们可以非常容易让不同环境支持不同的数据库。
+
+要理解多数据库支持的原理，请查看： :ref:`multi_db`。
+
+在 ``sample/pyape.toml`` 中已经包含了多数据库范例的支持。让我们看看 ``multidb`` 环境的配置，
+我们使用 :ref:`app.user_multidb <sample_app_user_multidb_py>` 模块替代 :ref:`app.user <sample_app_user_py>`。 ::
+
+    [ENV.multidb.'config.toml'.PATH.modules]
+    main = ''
+    user_multidb = '/user2'
+
+    [ENV.multidb.'config.toml'.SQLALCHEMY.URI]
+    # 多数据库配置，直接覆盖默认配置
+    db1 = 'sqlite:///{WORK_DIR}/sample_db1.sqlite'
+    db2 = 'sqlite:///{WORK_DIR}/sample_db2.sqlite'
+
+.. _sample_app_model_multidb_py:
+
+创建子模块 ``app/model_multidb.py`` 用于 Table 定义。
+在这里，可以使用 `Model()` 方法，传递 ``bind_key`` 参数来获取对应不同数据库的 Model。
+下面的 ``User1`` 和 ``User2`` 两个 Table 分别位于不同的数据库。
+
+.. code-block:: python
+
+    # app/model_multidb.py
+    import time
+
+    from sqlalchemy import Column, INT, VARCHAR
+
+    from pyape.app import gdb
+
+    Model1 = gdb.Model('db1')
+    Model2 = gdb.Model('db2')
+
+
+    class User1(Model1):
+        __tablename__ = 'user1'
+
+        id = Column(INT, autoincrement=True, primary_key=True)
+        name = Column(VARCHAR(100), nullable=False)
+        createtime = Column(INT, nullable=False, default=lambda: int(time.time()))
+
+
+    class User2(Model2):
+        __tablename__ = 'user2'
+
+        id = Column(INT, autoincrement=True, primary_key=True)
+        name = Column(VARCHAR(100), nullable=False)
+        createtime = Column(INT, nullable=False, default=lambda: int(time.time()))
+
+.. _sample_app_user_multidb_py:
+
+创建子模块 ``app/user_multidb.py`` 提供数据库访问方法。
+这里的范例简单传递 ``bind_key`` 参数用来指定写入不同的数据库。
+
+.. code-block:: python
+
+    from flask import Blueprint, abort
+    from webargs.flaskparser import use_args
+    from webargs import fields
+    from sqlalchemy import select
+
+    from pyape.app import gdb, logger
+    from app.model_multidb import User1, User2
+
+
+    user_multidb = Blueprint('user_multidb', __name__)
+
+
+    @user_multidb.get('/get')
+    @use_args({'id': fields.Int(required=True), 'bind_key': fields.Str(required=True)}, location='query')
+    def get_user_db1(args):
+        id = args['id']
+        bind_key = args['bind_key']
+        User = User1 if bind_key == 'db1' else User2
+        userobj = gdb.session().get(User, id)
+        if userobj is None:
+            logger.warning(f'user {id} is not found in {bind_key}.')
+            abort(404)
+        return f'User in {bind_key} id: {userobj.id}, name: {userobj.name}'
+
+
+    @user_multidb.post('/set')
+    @use_args({'id': fields.Int(required=True), 'name': fields.Str(required=True), 'bind_key': fields.Str(required=True)}, location='form')
+    def set_user(args):
+        bind_key = args['bind_key']
+        User = User1 if bind_key == 'db1' else User2
+        userobj = User(**args)
+        gdb.session().add(userobj)
+        gdb.session().commit()
+        return f'User in {bind_key} id: {userobj.id}, name: {userobj.name}'
+
+.. _test_sample_multidb:
+
+测试 Sample 项目的 multidb 环境（多数据库支持）
+------------------------------------------------------------
+
+若 pyape 项目位于 ``~/storage/pyape``： ::
+
+    # 进入虚拟环境
+    cd ~/storage/pyape
+    python3 -m venv venv
+    source venv/bin/active
+
+    # 安装当前环境下的 pyape
+    (venv) pip install -e .
+
+    # 创建本地配置文件，使用 multidb 环境
+    (venv) pyape config -FE multidb config.toml .env
+
+    # 运行单元测试
+    (venv) pytest tests/test_sample_env_multidb.py
