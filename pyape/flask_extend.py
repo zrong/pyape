@@ -125,7 +125,16 @@ class PyapeDB(SQLAlchemy):
         self._app = app
         self._gconf = app._gconf
         sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
+        # super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
         super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
+        self._app.logger.info(f'self.Session aaaa {self.Session}')
+
+        @app.teardown_appcontext
+        def shutdown_session(response_or_exc):
+            self._app.logger.info(f'PyapeDB.Session.remove: {self.Session}')
+            # https://docs.sqlalchemy.org/en/14/orm/contextual.html
+            self.Session.remove()
+            return response_or_exc
 
     def get_app(self, reference_app: PyapeFlask=None) -> PyapeFlask:
         if reference_app is not None:

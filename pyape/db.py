@@ -176,13 +176,14 @@ class DBManager(object):
     URI: Union[dict, str] = None
     """ 从配置文件中解析出的 URI 值，可能是 str 或者 dict。"""
 
+    Session_Factory = None
+    """ Session 工厂类，使用 sessionmaker 生成。"""
+
     __engine_lock: Lock = Lock()
     # 保存 engines 对象
     __engines: dict = None
     # 保存 sessionmaker 需要的 binds 参数
     __binds: dict = None
-    # 保存 Session 生成器
-    __Session_Factory = None
     # 保存所有的 Model class
     __model_classes: dict = None
 
@@ -217,7 +218,7 @@ class DBManager(object):
         for name, uri in view:
             self.__add_bind(name, uri)
 
-        self.__Session_Factory = sessionmaker(
+        self.Session_Factory = sessionmaker(
             binds=self.__binds,
             autoflush=False,
             future=True
@@ -250,7 +251,7 @@ class DBManager(object):
         # 以便新创建的 Session 实例包含新的 bind
         # 对于已经创建的实例，需要调用 Session.bind_mapper 进行绑定
         if succ:
-            self.__Session_Factory.configure(binds=self.__binds)
+            self.Session_Factory.configure(binds=self.__binds)
             return
         raise KeyError(f'bind_key {bind_key} is duplicated!')
 
@@ -279,20 +280,20 @@ class DBManager(object):
         """
         return self.__engines.get(bind_key or self.default_bind_key)
 
-    def create_session(self) -> Session:
+    def create_new_session(self) -> Session:
         """ 创建一个 Session 对象。 """
-        return self.__Session_Factory()
+        return self.Session_Factory()
 
-    def create_scoped_session(self, in_flask: bool=False) -> Session:
-        """ 创建一个 scoped session 对象。
+    def create_scoped_session(self, in_flask: bool=False) -> scoped_session:
+        """ 创建一个 scoped_session 代理。
 
         :param in_flask: 是否在 Flask 中使用。
         """
         if in_flask:
             import flask
-            return scoped_session(self.__Session_Factory, 
+            return scoped_session(self.Session_Factory, 
                 scopefunc=flask._app_ctx_stack.__ident_func__)
-        return scoped_session(self.__Session_Factory)
+        return scoped_session(self.Session_Factory)
         
 
 class SQLAlchemy(object):
@@ -307,7 +308,9 @@ class SQLAlchemy(object):
     dbm: DBManager = None
     is_scoped: bool = True
     in_flask: bool = True
-    __session: Session = None
+
+    Session: Union[sessionmaker, scoped_session] = None
+    """ 根据 is_scoped 的值，保存 sessionmaker 或者 scoped_session 的结果对象。"""
 
     def __init__(self,
         dbm: DBManager=None,
@@ -322,11 +325,10 @@ class SQLAlchemy(object):
         self.in_flask = in_flask
         # 若 in_flask 为真，则 is_scoped 一定为真
         self.is_scoped = True if in_flask else is_scoped
-        self.__session = self.__build_session()
-
-    def __build_session(self) -> Session:
-        return self.dbm.create_scoped_session(self.in_flask) \
-            if self.is_scoped else self.dbm.create_session() 
+        if self.is_scoped:
+            self.Session = self.dbm.create_scoped_session(self.in_flask)
+        else:
+            self.Session = self.dbm.Session_Factory
 
     def Model(self, bind_key: str=None):
         """ 获取对应的 Model Factory class。
@@ -345,14 +347,10 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
-    def session(self, create_new: bool=False) -> Session:
-        """ 获取对应的 session 实例
-
-        :param create_new: 使用独立的 session 实例。
+    def session(self, **kwargs) -> Session:
+        """ 获取一个 Session 对象。
         """
-        if create_new:
-            return self.__build_session()
-        return self.__session
+        return self.Session()
 
     def query(self, model_cls) -> Query:
         """ 获取一个 Query 对象。
