@@ -8,8 +8,10 @@ pyape.app.rfun
 import time
 
 import toml
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.expression import or_
+from sqlalchemy.orm import Session
 
 from pyape.app.re2fun import get_request_values, responseto, get_page_response
 from pyape.app.queryfun import commit_and_response_error
@@ -38,7 +40,7 @@ def regional_get(regional_cls, r, merge):
     """
     if r is None:
         return responseto('Param please!', code=401)
-    robj = gdb.query(regional_cls).get(r)
+    robj = gdb.session.get(regional_cls, r)
     if robj is None:
         return responseto('No regional %s!' % r, code=404)
 
@@ -109,7 +111,7 @@ def regional_edit(regional_cls, r, name, value, kindtype, status):
     kindtype = parse_int(kindtype)
     if r is None:
         return responseto('Param please!', code=401)
-    robj = gdb.query(regional_cls).get(r)
+    robj = gdb.session().get(regional_cls, r)
     if robj is None:
         return responseto('找不到 regional %s!' % r, code=404)
     if name is not None:
@@ -141,14 +143,13 @@ def regional_del(regional_cls, valueobject_cls, r):
     if r is None:
         return responseto('Param please!', code=401)
     # 必须先删除所有的与这个 Regional 相关的关系
-    vo = gdb.query(valueobject_cls).filter_by(r=r).first()
+    dbs: Session = gdb.session()
+    vo = dbs.execute(select(valueobject_cls).filter_by(r=r)).scalar()
     if vo is not None:
         return responseto('Please delete valueobjet of %s first!' % r, code=403)
 
-    session = gdb.session(regional_cls.bind_key, create_new=True)
-    robj = session.query(regional_cls).filter_by(r=r).first()
-    resp = commit_and_response_error(robj, session, delete=True, bind_key=regional_cls.bind_key)
-    session.close()
+    robj = dbs.execute(select(regional_cls).filter_by(r=r)).scalar()
+    resp = commit_and_response_error(robj, dbs, delete=True)
     if resp is not None:
         return resp
     return responseto(regional=robj, code=200)

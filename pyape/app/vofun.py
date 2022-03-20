@@ -7,6 +7,9 @@ pyape.app.vofun
 
 import time
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from pyape.util.func import parse_int
 from pyape.app import gdb, gcache, logger
 from pyape.app.models.valueobject import ValueObject, get_vo_query
@@ -43,7 +46,7 @@ def _get_vo_by_cache(r, name):
     """
     valueobj = gcache.getg(name, r)
     if valueobj is None:
-        vo = ValueObject.query.filter_by(name=name).first()
+        vo = gdb.execute(select(ValueObject).filter_by(name=name), use_session=True).scalar()
         if vo is not None:
             valueobj = vo.get_value()
             gcache.setg(name, valueobj, r)
@@ -85,10 +88,11 @@ def valueobject_get(r, vid, name, merge, withcache, return_dict=False):
 
     # 从数据库中查询
     vo = None
+    dbs: Session = gdb.session()
     if vid is not None:
-        vo = ValueObject.query.get(vid)
+        vo = dbs.get(ValueObject, vid)
     elif name is not None:
-        vo = ValueObject.query.filter_by(name=name).first()
+        vo = dbs.execute(select(ValueObject).filter_by(name=name)).scalar()
     else:
         return responseto('vid or name please!', code=401, return_dict=return_dict)
     if vo is None:

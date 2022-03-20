@@ -131,7 +131,7 @@ class PyapeDB(SQLAlchemy):
 
         @app.teardown_appcontext
         def shutdown_session(response_or_exc):
-            self._app.logger.info(f'PyapeDB.Session.remove: {self.Session}')
+            # self._app.logger.info(f'PyapeDB.Session.remove: {self.Session}')
             # https://docs.sqlalchemy.org/en/14/orm/contextual.html
             self.Session.remove()
             return response_or_exc
