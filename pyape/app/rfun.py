@@ -8,13 +8,13 @@ pyape.app.rfun
 import time
 
 import toml
+from flask import jsonify
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.expression import or_
 from sqlalchemy.orm import Session
 
-from pyape.app.re2fun import get_request_values, responseto, get_page_response
-from pyape.app.queryfun import commit_and_response_error
+from pyape.app.re2fun import responseto, get_page_response
 from pyape.app import gdb, logger
 from pyape.util.func import parse_int
 
@@ -96,11 +96,13 @@ def regional_add(regional_cls, r, name, value, kindtype, status):
 
     now = int(time.time())
     robj = regional_cls(r=r, name=name, value=value, status=status, kindtype=kindtype, createtime=now, updatetime=now)
-    session = gdb.session(regional_cls.bind_key, create_new=True)
-    resp = commit_and_response_error(robj, session, refresh=True, bind_key=regional_cls.bind_key)
-    session.close()
-    if resp is not None:
-        return resp
+    dbs: Session = gdb.session()
+    try:
+        dbs.add(robj)
+        dbs.commit()
+        dbs.refresh(robj)
+    except SQLAlchemyError as e:
+        return jsonify({'error': True, 'message': str(e), 'code': 500})
     return responseto(regional=robj, code=200)
     
 
@@ -129,11 +131,13 @@ def regional_edit(regional_cls, r, name, value, kindtype, status):
     if status is not None:
         robj.status = status
     robj.updatetime = int(time.time())
-    session = gdb.session(regional_cls.bind_key, create_new=True)
-    resp = commit_and_response_error(robj, session, refresh=True, bind_key=regional_cls.bind_key)
-    session.close()
-    if resp is not None:
-        return resp
+    dbs: Session = gdb.session()
+    try:
+        dbs.add(robj)
+        dbs.commit()
+        dbs.refresh(robj)
+    except SQLAlchemyError as e:
+        return jsonify({'error': True, 'message': str(e), 'code': 500})
     return responseto(regional=robj, code=200)
     
 
@@ -146,10 +150,12 @@ def regional_del(regional_cls, valueobject_cls, r):
     dbs: Session = gdb.session()
     vo = dbs.execute(select(valueobject_cls).filter_by(r=r)).scalar()
     if vo is not None:
-        return responseto('Please delete valueobjet of %s first!' % r, code=403)
+        return responseto(f'Please delete valueobjet of {r} first!', code=403)
 
     robj = dbs.execute(select(regional_cls).filter_by(r=r)).scalar()
-    resp = commit_and_response_error(robj, dbs, delete=True)
-    if resp is not None:
-        return resp
+    try:
+        dbs.delete(robj)
+        dbs.commit()
+    except SQLAlchemyError as e:
+        return jsonify({'error': True, 'message': str(e), 'code': 500})
     return responseto(regional=robj, code=200)

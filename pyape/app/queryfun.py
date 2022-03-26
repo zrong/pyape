@@ -33,25 +33,3 @@ def get_total_value(query, sum_field):
     if total_value_entry is None:
         return 0
     return 0 if total_value_entry.total_value is None else int(total_value_entry.total_value)
-
-
-def commit_and_response_error(inst, session: Session, refresh=False, delete=False, return_dict=False):
-    """ 将提交一个 instance 并返回错误响应，封装成一个操作
-    """
-    try:
-        if delete:
-            session.delete(inst)
-        else:
-            session.add(inst)
-        session.commit()
-        if refresh:
-            session.refresh(inst)
-        return None
-    except Exception as e:
-        msg = str(e)
-        logger.error(msg)
-        session.rollback()
-        resp_dict = {'error': True, 'message': msg, 'code': 500}
-        if return_dict:
-            return resp_dict
-        return jsonify(resp_dict)

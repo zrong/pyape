@@ -7,14 +7,15 @@ pyape.app.vofun
 
 import time
 
+from flask import jsonify
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from pyape.util.func import parse_int
 from pyape.app import gdb, gcache, logger
 from pyape.app.models.valueobject import ValueObject, get_vo_query
-from pyape.app.re2fun import get_request_values, responseto, get_page_response
-from pyape.app.queryfun import commit_and_response_error
+from pyape.app.re2fun import responseto, get_page_response
 
 
 # @checker.request_checker('votype', 'status', 'merge', defaultvalue={'merge': 1, 'status': 1}, request_key='args', parse_int_params=['merge', 'status', 'votype'])
@@ -134,9 +135,13 @@ def valueobject_add(r, withcache, name, value, votype, status=None, index=None, 
         updatetime=now,
         note=note)
 
-    resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
-    if resp is not None:
-        return resp
+    try:
+        dbs: Session = gdb.session()
+        dbs.add(voitem)
+        dbs.commit()
+        dbs.refresh(voitem)
+    except SQLAlchemyError as e:
+        return jsonify({'error': True, 'message': str(e), 'code': 500})
 
     if withcache > 0:
         valueobj = ValueObject.load_value(value)
@@ -194,9 +199,13 @@ def valueobject_edit(r, withcache, vid=None, name=None, value=None, votype=None,
     if votype is not None:
         voitem.votype = votype
 
-    resp = commit_and_response_error(voitem, refresh=True, return_dict=True)
-    if resp is not None:
-        return resp
+    try:
+        dbs: Session = gdb.session()
+        dbs.add(voitem)
+        dbs.commit()
+        dbs.refresh(voitem)
+    except SQLAlchemyError as e:
+        return jsonify({'error': True, 'message': str(e), 'code': 500})
 
     if withcache > 0:
         valueobj = ValueObject.load_value(value)
@@ -220,11 +229,16 @@ def valueobject_del(vid, name, return_dict=False):
     r = vo.r
     name = vo.name
 
-    resp = commit_and_response_error(vo, delete=True)
-    if resp is not None:
-        return resp
+    try:
+        dbs: Session = gdb.session()
+        dbs.delete(vo)
+        dbs.commit()
+    except SQLAlchemyError as e:
+        error_dict = {'error': True, 'message': str(e), 'code': 500}
+        if return_dict:
+            return error_dict
+        return jsonify(error_dict)
     gcache.delg(name, r)
-
     return responseto(return_dict=return_dict)
 
 
