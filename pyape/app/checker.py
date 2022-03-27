@@ -8,7 +8,7 @@ from functools import wraps
 
 from flask import request, abort
 
-from pyape.app import logger, gcache, gconfig
+from pyape.app import logger, gconfig
 from pyape.app.re2fun import get_request_values
 from pyape.util.func import parse_int
 

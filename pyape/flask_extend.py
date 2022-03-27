@@ -127,7 +127,7 @@ class PyapeDB(SQLAlchemy):
         sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
         # super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
         super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
-        self._app.logger.info(f'self.Session aaaa {self.Session}')
+        self._app.logger.info(f'self.Session {self.Session}')
 
         @app.teardown_appcontext
         def shutdown_session(response_or_exc):
