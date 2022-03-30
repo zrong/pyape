@@ -125,8 +125,8 @@ class PyapeDB(SQLAlchemy):
         self._app = app
         self._gconf = app._gconf
         sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
-        # super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
-        super().__init__(URI=sql_uri, is_scoped=True, in_flask=True)
+        sql_options = self._gconf.getcfg('SQLALCHEMY', 'ENGINE_OPTIONS')
+        super().__init__(URI=sql_uri, ENGINE_OPTIONS=sql_options, is_scoped=True, in_flask=True)
         self._app.logger.info(f'self.Session {self.Session}')
 
         @app.teardown_appcontext

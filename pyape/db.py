@@ -13,7 +13,7 @@ from threading import Lock
 from typing import Iterable, Union
 from sqlalchemy.schema import Table, MetaData
 from sqlalchemy.orm import DeclarativeMeta, declarative_base, sessionmaker, Session, scoped_session, Query
-from sqlalchemy.engine import Engine, create_engine, Result
+from sqlalchemy.engine import Engine, create_engine, Result, make_url, URL
 
 
 class Pagination(object):
@@ -176,6 +176,9 @@ class DBManager(object):
     URI: Union[dict, str] = None
     """ 从配置文件中解析出的 URI 值，可能是 str 或者 dict。"""
 
+    ENGINE_OPTIONS: dict = None
+    """ 从配置文件中解析出的 ENGINE_OPTION 值。用于数据库引擎的配置。"""
+
     Session_Factory = None
     """ Session 工厂类，使用 sessionmaker 生成。"""
 
@@ -187,11 +190,12 @@ class DBManager(object):
     # 保存所有的 Model class
     __model_classes: dict = None
 
-    def __init__(self, URI: Union[dict, str], **kwargs: dict) -> None:
+    def __init__(self, URI: Union[dict, str], ENGINE_OPTIONS: dict=None, **kwargs: dict) -> None:
         self.__engines = {}
         self.__binds = {}
         self.__model_classes = {}
         self.URI = URI
+        self.ENGINE_OPTIONS = ENGINE_OPTIONS
         self.__build_binds()
 
     @property
@@ -233,7 +237,63 @@ class DBManager(object):
         return False
         
     def __set_engine(self, bind_key: str, uri: str) -> None:
-        engine = create_engine(uri, future=True)
+        sa_url: URL = make_url(uri)
+
+        options: dict = self.ENGINE_OPTIONS or {}
+        options.setdefault('future', True)
+
+        if sa_url.drivername.startswith('mysql'):
+            # 加入 charset 设置，用于 utf8mb4 这种 charset
+            query = dict(sa_url.query)
+            query.setdefault('charset', 'utf8')
+            sa_url = sa_url.set(query=query)
+
+            if sa_url.drivername != 'mysql+gaerdbms':
+                # 对于 MySQL 来说，设置 pool_recycle 是必须的，原因如下：
+                # pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query')
+                # 连接池连接mysql数据库失败，应该是mysql数据库连接超时，mysql数据库配置文件存在以下两个参数，是负责管理连接超时的。
+                # 1. interactive_timeout：针对交互式连接
+                # 2. wait_timeout：针对非交互式连接。
+                # 所谓的交互式连接，即在mysql_real_connect()函数中使用了CLIENT_INTERACTIVE选项。说得直白一点，通过mysql客户端连接数据库是交互式连接，通过jdbc连接数据库是非交互式连接。
+                # 这两个参数在腾讯云 MySQL 中默认都是 3600 秒，也就是超过1小时的连接就会自动失效。这本身并没什么问题，真正的问题是：我们做项目一般使用数据库连接池来获取连接，连接池里的连接可能会较长时间不关闭，等待被使用，这就与mysql连接超时机制起了冲突
+                # 当超过8个小时没有新的数据库请求的时候，数据库连接就会断开，如果我们连接池的配置是用不关闭或者关闭时间超过8小时，这个时候连接池没有回收并且还认为连接池与数据库之间的连接还存在，就会继续连接，但是数据库连接断开了，就会报错 2013: Lost connection to MySQL server during query.
+                # pool_recycle 回收时间（就是一定时间内不使用就会回收），修改这个参数的值，不要大于wait_timeout的值即可。下面的设置意味着每隔 3000 秒就回收一次连接线程池。
+
+                options.setdefault('pool_size', 10)
+                options.setdefault('pool_recycle', 7200)
+
+        elif sa_url.drivername == 'sqlite':
+            pool_size = options.get('pool_size')
+            detected_in_memory = False
+            if sa_url.database in (None, '', ':memory:'):
+                detected_in_memory = True
+
+                from sqlalchemy.pool import StaticPool
+                options['poolclass'] = StaticPool
+                if 'connect_args' not in options:
+                    options['connect_args'] = {}
+                # https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
+                options['connect_args']['check_same_thread'] = False
+
+                # we go to memory and the pool size was explicitly set
+                # to 0 which is fail.  Let the user know that
+                if pool_size == 0:
+                    raise RuntimeError('SQLite in memory database with an '
+                                       'empty queue not possible due to data '
+                                       'loss.')
+            # if pool size is None or explicitly set to 0 we assume the
+            # user did not want a queue for this sqlite connection and
+            # hook in the null pool.
+            elif not pool_size:
+                from sqlalchemy.pool import NullPool
+                options['poolclass'] = NullPool
+
+        engine = create_engine(sa_url, **options)
+
+        # options['poolclass'] = StaticPool
+        # if 'connect_args' not in options:
+        #     options['connect_args'] = {}
+        # options['connect_args']['check_same_thread'] = False
         # 保存 engine
         self.__engines[bind_key] = engine
         return engine
@@ -314,13 +374,14 @@ class SQLAlchemy(object):
 
     def __init__(self,
         dbm: DBManager=None,
-        URI: dict=None,
+        URI: Union[dict, str]=None,
+        ENGINE_OPTIONS: dict=None,
         is_scoped: bool=True,
         in_flask: bool=False,
         **kwargs: dict) -> None:
 
         if dbm is None:
-            dbm = DBManager(URI, **kwargs)
+            dbm = DBManager(URI, ENGINE_OPTIONS, **kwargs)
         self.dbm = dbm
         self.in_flask = in_flask
         # 若 in_flask 为真，则 is_scoped 一定为真
