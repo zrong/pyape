@@ -1,5 +1,6 @@
 flask>=2.0.2
 sqlalchemy>=1.4.32
+fabric>=2.7.0
 wheel
 flask-compress
 PyMySQL
@@ -7,7 +8,6 @@ python-dotenv
 cryptography
 redis
 toml
-fabric
 patchwork
 python-json-logger
 pyzmq

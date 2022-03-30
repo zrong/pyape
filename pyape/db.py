@@ -350,9 +350,15 @@ class DBManager(object):
         :param in_flask: 是否在 Flask 中使用。
         """
         if in_flask:
-            import flask
+            try:
+                from greenlet import getcurrent as _get_ident
+            except ImportError:
+                from threading import get_ident as _get_ident
+            # werkzeug/local.py:215: DeprecationWarning: '__ident_func__' is deprecated and will be removed in Werkzeug 2.1. It should not be used in Python 3.7+.
+            # import flask
+            # _get_ident = flask._app_ctx_stack.__ident_func__
             return scoped_session(self.Session_Factory, 
-                scopefunc=flask._app_ctx_stack.__ident_func__)
+                scopefunc=_get_ident)
         return scoped_session(self.Session_Factory)
         
 
@@ -463,6 +469,11 @@ class SQLAlchemy(object):
         else:
             metadata.drop_all(bind=engine, checkfirst=True)
     
+    def recreate_table(self, *table_names: str, bind_key: str=None) -> None:
+        """ 重建 table，支持单个或者多个名称。"""
+        self.drop_tables(table_names=table_names, bind_key=bind_key)
+        self.create_tables(table_names=table_names, bind_key=bind_key)
+
     def create_all(self) -> None:
         """ 创建所有数据库中的所有表。
         """
