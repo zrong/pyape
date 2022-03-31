@@ -6,7 +6,7 @@
 
 from pkg_resources import resource_filename
 from pathlib import Path
-import toml
+import tomli as tomllib
 
 # pyape 安装所在的文件夹
 # module_dir = Path(resource_filename('pyape', '__init__.py')).parent
@@ -35,7 +35,7 @@ def get_pyape_toml(pyape_toml: Path) -> tuple[bool, dict]:
     """
     err = None
     try:
-        pyape_conf = toml.load(pyape_toml)
+        pyape_conf = tomllib.loads(pyape_toml.read_text())
         pyape_conf['RSYNC_EXCLUDE']
         pyape_conf['NAME']
         pyape_conf['PYE']
@@ -44,8 +44,8 @@ def get_pyape_toml(pyape_toml: Path) -> tuple[bool, dict]:
         return True, pyape_conf
     except FileNotFoundError:
         err = 'Please call "pyape init" to generate a "pyape.toml" file.'
-    except toml.TomlDecodeError as e:
-        err = f'Decode {pyape_toml.resolve()} error: {e}'
+    except tomllib.TOMLDecodeError as e:
+        err = f'Decode {pyape_toml.resolve().as_posix()} error: {e}'
     except KeyError as e:
         err = f'Key error: {e.args[0]}'
     return False, err

@@ -7,7 +7,7 @@ pyape.app.rfun
 
 import time
 
-import toml
+import tomli as tomllib
 from flask import jsonify
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -88,8 +88,8 @@ def regional_add(regional_cls, r, name, value, kindtype, status):
         return responseto('Param please!', code=401)
     kindtype = parse_int(kindtype, 0)
     try:
-        toml.loads(value)
-    except toml.TomlDecodeError as e:
+        tomllib.loads(value)
+    except tomllib.TOMLDecodeError as e:
         msg = 'value is not a TOML string: %s' % str(e)
         logger.error(msg)
         return responseto(msg, code=401)
@@ -120,9 +120,9 @@ def regional_edit(regional_cls, r, name, value, kindtype, status):
         robj.name = name
     if value is not None:
         try:
-            toml.loads(value)
+            tomllib.loads(value)
             robj.value = value
-        except toml.TomlDecodeError as e:
+        except tomllib.TOMLDecodeError as e:
             msg = 'value is not a TOML string: %s' % str(e)
             logger.error(msg)
             return responseto(msg, code=401)

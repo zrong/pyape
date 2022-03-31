@@ -8,7 +8,8 @@ vo = ValueObject 用于存储所有量不大的值对象
 """
 
 import json
-import toml
+import tomli as tomllib
+import tomli_w
 
 from sqlalchemy.sql.expression import or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,8 +26,8 @@ def dump_value(value, type_='json'):
     if type_ == 'toml':
         # toml 不支持 list 格式，对于之前 json list 格式的配置文件，加入一个顶级的 ROOTLIST 键
         if isinstance(value, list):
-            return toml.dumps({'ROOTLIST': value})
-        return toml.dumps(value)
+            return tomli_w.dumps({'ROOTLIST': value})
+        return tomli_w.dumps(value)
     return json.dumps(value, ensure_ascii=False)
 
 
@@ -38,7 +39,7 @@ def load_value(value, type_=None):
     """
     # logger.info('ValueObject.load_value %s, type: %s', value, type_)
     def toml_loads(value):
-        tobj = toml.loads(value, dict)
+        tobj = tomllib.loads(value, dict)
         # toml 不支持 list 格式，对于之前 json list 格式的配置文件，加入一个顶级的 ROOTLIST 键
         # 若存在这个键且其值为 list，则仅返回这个 list
         rootlist = tobj.get('ROOTLIST')

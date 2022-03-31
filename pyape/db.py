@@ -414,17 +414,17 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
-    def session(self, **kwargs) -> Session:
+    def session(self) -> Session:
         """ 获取一个 Session 对象。
         """
         return self.Session()
 
-    def query(self, model_cls) -> Query:
+    def query(self, *entities) -> Query:
         """ 获取一个 Query 对象。
 
         :param model_cls: 一个 Model对象。
         """
-        return self.session().query(model_cls)
+        return self.session().query(*entities)
         
     def metadata(self, bind_key: str=None) -> MetaData:
         """ 获取对应 Model 的 metadata 实例

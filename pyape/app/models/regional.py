@@ -5,7 +5,7 @@ pyape.app.models.regional
 与 regional 表相关的方法
 """
 import time
-import toml
+import tomli as tomllib
 from sqlalchemy.orm import Query, Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import Enum, SMALLINT, VARCHAR, INTEGER, FLOAT, TEXT, TIMESTAMP
@@ -60,7 +60,7 @@ def make_regional_table_cls(table_name: str='regional', bind_key: str=None):
         """
         parsed_dict = {}
         if self.value is not None:
-            parsed_dict = toml.loads(self.value)
+            parsed_dict = tomllib.loads(self.value)
         parsed_dict['name'] = self.name
         parsed_dict['r'] = self.r
         parsed_dict['kindtype'] = self.kindtype

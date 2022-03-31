@@ -10,7 +10,8 @@ import jinja2
 from pathlib import Path
 from typing import Any, Optional
 
-import toml
+import tomli as tomllib
+import tomli_w
 from pyape.tpl import base_dir as pyape_tpl_dir
 
 
@@ -90,7 +91,7 @@ class ConfigWriter(object):
         if self.tpl_name.endswith('.json'):
             self.dst_file.write_text(json.dumps(self.replace_obj, ensure_ascii=False, indent=4))
         elif self.tpl_name.endswith('.toml'):
-            self.dst_file.write_text(toml.dumps(self.replace_obj))
+            self.dst_file.write_text(tomli_w.dumps(self.replace_obj))
         elif self.tpl_name == '.env':
             self._write_key_value()
         else:
@@ -205,10 +206,10 @@ replace_obj: {replace_obj}.''')
         """ 写入配置文件"""
         replace_obj = self.get_tpl_value(tpl_name)
         # print(f'write_config_file {tpl_name} {replace_obj}')
-        replace_str = toml.dumps(replace_obj)
+        replace_str = tomli_w.dumps(replace_obj)
         # 将 obj 转换成 toml 字符串，进行一次替换，然后再转换回 obj
         # 采用这样的方法可以不必处理复杂的层级关系
-        replace_obj = toml.loads(self.replace(replace_str))
+        replace_obj = tomllib.loads(self.replace(replace_str))
         # 不加后缀的文件路径
         target = self.work_dir.joinpath(tpl_name)
         # 加入后缀的文件路径，大部分情况下雨 target 相同

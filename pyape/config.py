@@ -10,8 +10,10 @@ pyape.config
 
 from pathlib import Path
 import json
+from statistics import mode
 from typing import Any, Union
-import toml
+import tomli as tomllib
+import tomli_w
 
 
 # 根据平台中的配置字符串，确定属于哪个平台
@@ -163,7 +165,8 @@ class GlobalConfig(object):
         conf_file = self.getdir(filename, work_dir=work_dir)
         if conf_file.exists():
             if filename.endswith('.toml'):
-                return toml.load(conf_file)
+                with conf_file.open(mode='rb') as f:
+                    return tomllib.load(f)
             elif filename.endswith('.json'):
                 return json.load(conf_file)
             elif throw_error:
@@ -179,7 +182,8 @@ class GlobalConfig(object):
         """
         conf_file = self.getdir(filename, work_dir=work_dir)
         if filename.endswith('.toml'):
-            toml.dump(data_dict, conf_file)
+            with conf_file.open(mode='wb') as f:
+                tomli_w.dump(data_dict, f)
         elif filename.endswith('.json'):
             json.dump(data_dict, conf_file,  ensure_ascii=False, indent=2)
             

@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-import toml
+import tomli as tomllib
 import pytest
 
 from pyape.config import GlobalConfig
@@ -25,7 +25,7 @@ def global_config():
     global config_toml
     work_dir = Path(__file__).parent
     config_toml = config_toml.format(WORK_DIR=work_dir.as_posix())
-    config_dict = toml.loads(config_toml)
+    config_dict = tomllib.loads(config_toml)
     return GlobalConfig(work_dir, config_dict)
 
 
