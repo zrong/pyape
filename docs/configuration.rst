@@ -56,7 +56,7 @@ pyape 的多开发环境支持，可以支持在 ``pyape.toml`` 中进行多套�
 例如，根元素下的 `DEPLOY_DIR` 配置，若希望在 ``prod`` 环境中使用不同的值，可以增加这样的配置： ::
 
     [ENV.prod]
-    DEPLOY_DIR = '/srv/app/{NAME}_prod'
+    DEPLOY_DIR = '/srv/app/{{NAME}}_prod'
     
 若希望在 ``local`` 环境中使用调试方式启动 Flask，则可以覆盖默认的 ``FLASK_ENV``： ::
 
@@ -84,14 +84,14 @@ pyape 的多开发环境支持，可以支持在 ``pyape.toml`` 中进行多套�
 
     # 正式环境的数据库使用 DEPLOY_DIR 来定位 
     [ENV.prod.'config.toml'.SQLALCHEMY]
-    URI = 'sqlite:///{DEPLOY_DIR}/pyape.sqlite'
+    URI = 'sqlite:///{{DEPLOY_DIR}}/pyape.sqlite'
 
     # 正式环境的 gunicorn 使用 sock 绑定，并指定 pid 和 log 文件
     [ENV.prod.'gunicorn.conf.py']
-    bind = 'unix:{DEPLOY_DIR}/gunicorn.sock'
-    pidfile = '{DEPLOY_DIR}/gunicorn.pid'
-    accesslog = '{DEPLOY_DIR}/logs/access.log'
-    errorlog = '{DEPLOY_DIR}/logs/error.log
+    bind = 'unix:{{DEPLOY_DIR}}/gunicorn.sock'
+    pidfile = '{{DEPLOY_DIR}}/gunicorn.pid'
+    accesslog = '{{DEPLOY_DIR}}/logs/access.log'
+    errorlog = '{{DEPLOY_DIR}}/logs/error.log
     
 .. _pyape_toml_root:
 
@@ -105,11 +105,11 @@ PYE
 
 NAME
     项目名称。 可以用做替换值。
-    配置文件中所有包含 ``{NAME}`` 的参数都会被这里的值替换。
+    配置文件中所有包含 ``{{NAME}}`` 的参数都会被这里的值替换。
     
 DEPLOY_DIR
     **远程服务器专用**。设定部署在服务器上的文件夹。 可以用做替换值。
-    配置文件中所有包含 ``{DEPLOY_DIR}`` 的参数都会被这里的值替换。
+    配置文件中所有包含 ``{{DEPLOY_DIR}}`` 的参数都会被这里的值替换。
 
 RSYNC_EXCLUDE
     **远程服务器专用**。这是一个列表，定义在使用 :ref:`cli_pyape_deploy` 命令将本地代码同步到远程服务器时的排除文件。
@@ -117,20 +117,20 @@ RSYNC_EXCLUDE
     
 REPLACE_ENVIRON
     这是一个列表。定义允许被替换的环境变量的名称。
-    若配置文件中包含下面的名称，并使用 ``{}`` 包裹，则会被替换成环境变量中的值。
+    若配置文件中包含下面的名称，并使用 ``{{}}`` 包裹，则会被替换成环境变量中的值。
 
     例如：
 
     1. 项目 NAME 为 ``pyape``，作为环境变量替换时，会被转换为全大写 ``PYAPE``。
     2. 环境变量中包含 ``PYAPE_LOCAL_SECRET_KEY``。
-    3. 使用 ``--env local`` 生成配置文件时，将替换 ``{SECRET_KEY}`` 的值为环境变量中的 ``PYAPE_LOCAL_SECRET_KEY``。
+    3. 使用 ``--env local`` 生成配置文件时，将替换 ``{{SECRET_KEY}}`` 的值为环境变量中的 ``PYAPE_LOCAL_SECRET_KEY``。
 
     默认提供了四个环境变量替换：
 
-    - ``{ADMIN_NAME}`` 管理员帐号
-    - ``{ADMIN_PASSWORD}`` 管理员密码
-    - ``{SECRET_KEY}`` flask 框架加密使用
-    - ``{SQLALCHEMY_URI}`` 数据库地址和密码定义
+    - ``{{ADMIN_NAME}}`` 管理员帐号
+    - ``{{ADMIN_PASSWORD}}`` 管理员密码
+    - ``{{SECRET_KEY}}`` flask 框架加密使用
+    - ``{{SQLALCHEMY_URI}}`` 数据库地址和密码定义
     
     亦可自行增加环境变量，保证配置文件中的变量名称相同即可。
 
@@ -162,7 +162,7 @@ user
 
 其内容为 FLASK 运行需要的配置。默认值为： ::
 
-    FLASK_APP = 'wsgi:{NAME}_app'
+    FLASK_APP = 'wsgi:{{NAME}}_app'
     FLASK_ENV = 'production'
     FLASK_RUN_PORT = 500
 
@@ -180,8 +180,8 @@ pyape 会调用 `flask.cli.load_env <https://flask.palletsprojects.com/en/2.0.x/
 
 默认值为： ::
 
-    wsgi_app = 'wsgi:{NAME}_app'
-    proc_name = '{NAME}'
+    wsgi_app = 'wsgi:{{NAME}}_app'
+    proc_name = '{{NAME}}'
     bind = '127.0.0.1:5001'
     umask = 0
     daemon = true
@@ -198,7 +198,7 @@ pyape 会调用 `flask.cli.load_env <https://flask.palletsprojects.com/en/2.0.x/
 
 默认值为： ::
 
-    callable = 'wsgi:{NAME}_app'
+    callable = 'wsgi:{{NAME}}_app'
     processes = 2
     threads = 1
     venv = '%dvenv'
@@ -229,7 +229,7 @@ pyape 会调用 `flask.cli.load_env <https://flask.palletsprojects.com/en/2.0.x/
 
 定义 flask 框架使用的变量，默认值为： ::
 
-    SECRET_KEY = '{SECRET_KEY}'
+    SECRET_KEY = '{{SECRET_KEY}}'
 
 定义在这里的变量会进入 `flask.config <https://flask.palletsprojects.com/en/2.0.x/api/?highlight=config#configuration>`_。
 
@@ -238,9 +238,9 @@ pyape 会调用 `flask.cli.load_env <https://flask.palletsprojects.com/en/2.0.x/
 
 定义数据库，默认值为： ::
 
-    # 单数据库地址配置， {WORK_DIR} 被替换为 pyape 运行文件夹的绝对路径
+    # 单数据库地址配置， {{WORK_DIR}} 被替换为 pyape 运行文件夹的绝对路径
     ['config.toml'.SQLALCHEMY]
-    URI = 'sqlite:///{WORK_DIR}/pyape.sqlite
+    URI = 'sqlite:///{{WORK_DIR}}/pyape.sqlite
     
 配置数据库的引擎参数： ::
 

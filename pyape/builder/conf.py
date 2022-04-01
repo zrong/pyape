@@ -187,7 +187,10 @@ class ConfigReplacer(object):
                 if environ_value is not None:
                     replace_obj[n] = environ_value
         try:
-            new_value = value.format_map(replace_obj)
+            # print(f'replace format_map {value=} {replace_obj=}')
+            templ: jinja2.Template = jinja2.Template(value)
+            # new_value = value.format_map(replace_obj)
+            new_value = templ.render(replace_obj)
             return new_value
         except KeyError as e:
             # 抛出对应的 environ key 的错误

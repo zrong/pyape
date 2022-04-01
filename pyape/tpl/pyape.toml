@@ -1,11 +1,11 @@
 #==============================================
 # pyape 的主配置文件
 #
-# 使用 {} 包含的变量名称会被替换成具体的值
+# 使用 {{}} 包含的变量名称会被替换成具体的值
 #
-# {NAME} 项目名称，定义在配置文件中
-# {WORK_DIR} 项目源码所在文件夹的绝对路径
-# {DEPLOY_DIR} 部署在服务器上的文件夹
+# {{NAME}} 项目名称，定义在配置文件中
+# {{WORK_DIR}} 项目源码所在文件夹的绝对路径
+# {{DEPLOY_DIR}} 部署在服务器上的文件夹
 #==============================================
 
 # pyape 项目的名称
@@ -15,19 +15,19 @@ NAME = 'pyape'
 PYE = 'python3'
 
 # 部署在服务器上的文件夹
-DEPLOY_DIR = '/srv/app/{NAME}'
+DEPLOY_DIR = '/srv/app/{{NAME}}'
 
 # 允许被替换的环境变量
-# 以下 {} 变量被环境变量替换
+# 以下 {{}} 变量被环境变量替换
 # 若值中包含下面的键，则会被替换成环境变量中的值
 # 例如：
 # 1. 项目 name 为 pyape（默认值），项目 name 作为环境变量替换时，会被转换为全大写
 # 2. 环境变量中包含 PYAPE_LOCAL_ADMIN_NAME
-# 3. 使用 --env local 生成配置文件时，将替换 {ADMIN_NAME} 的值为环境变量中的 PYAPE_LOCAL_ADMIN_NAME
-# {ADMIN_NAME} 管理员帐号
-# {ADMIN_PASSWORD} 管理员密码
-# {SECRET_KEY} flask 框架加密
-# {SQLALCHEMY_URI} 数据库地址和密码
+# 3. 使用 --env local 生成配置文件时，将替换 {{ADMIN_NAME}} 的值为环境变量中的 PYAPE_LOCAL_ADMIN_NAME
+# {{ADMIN_NAME}} 管理员帐号
+# {{ADMIN_PASSWORD}} 管理员密码
+# {{SECRET_KEY}} flask 框架加密
+# {{SQLALCHEMY_URI}} 数据库地址和密码
 #
 # 亦可自行增加环境变量，保证配置文件中的变量名称相同即可
 REPLACE_ENVIRON = ['ADMIN_NAME', 'ADMIN_PASSWORD', 'SECRET_KEY', 'SQLALCHEMY_URI']
@@ -70,11 +70,11 @@ name = 'pyape'
 user = 'app'
 # Supervisor 启动的 flask 进程之 app_module
 app_module = 'wsgi:pyape_app'
-cwd = '{DEPLOY_DIR}'
+cwd = '{{DEPLOY_DIR}}'
 
 # .env 基本配置文件内容，保存 FLASK 运行需要的配置，以及 flask.config 中的配置
 ['.env']
-FLASK_APP = 'wsgi:{NAME}_app'
+FLASK_APP = 'wsgi:{{NAME}}_app'
 FLASK_ENV = 'production'
 FLASK_RUN_PORT = 5000
 SQLALCHEMY_WARN_20 = 1
@@ -82,8 +82,8 @@ SQLALCHEMY_WARN_20 = 1
 
 # gunicorn.conf.py 的基本配置文件内容，可在 env 中进行覆盖
 ['gunicorn.conf.py']
-wsgi_app = 'wsgi:{NAME}_app'
-proc_name = '{NAME}'
+wsgi_app = 'wsgi:{{NAME}}_app'
+proc_name = '{{NAME}}'
 bind = '127.0.0.1:5001'
 umask = 0
 daemon = true
@@ -92,7 +92,7 @@ capture_output = true
 
 # uwsgi.ini 基本配置文件内容
 ['uwsgi.ini']
-callable = 'wsgi:{NAME}_app'
+callable = 'wsgi:{{NAME}}_app'
 processes = 2
 threads = 1
 venv = '%dvenv'
@@ -114,11 +114,11 @@ TRUSTED_TOKENS = []
 # flask 框架的配置
 ['config.toml'.FLASK]
 # 用于 FLASK 内部加密
-SECRET_KEY = '{SECRET_KEY}'
+SECRET_KEY = '{{SECRET_KEY}}'
 
 ['config.toml'.SQLALCHEMY]
-# 单数据库地址配置， {WORK_DIR} 被替换为 pyape 运行文件夹的绝对路径
-URI = 'sqlite:///{WORK_DIR}/pyape.sqlite'
+# 单数据库地址配置， {{WORK_DIR}} 被替换为 pyape 运行文件夹的绝对路径
+URI = 'sqlite:///{{WORK_DIR}}/pyape.sqlite'
 future = false
 
 # 单数据库配置数据库引擎参数
@@ -154,8 +154,8 @@ pool_recycle = 3600
 
 # 配置系统使用的根帐号和密码
 # ['config.toml'.ADMIN]
-# name = '{ADMIN_NAME}'
-# password = '{ADMIN_PASSWORD}'
+# name = '{{ADMIN_NAME}}'
+# password = '{{ADMIN_PASSWORD}}'
 
 # pyzog 是远程 logger 接收器： https://github.com/zrong/pyzog
 ['config.toml'.LOGGER.pyzog]
@@ -213,16 +213,16 @@ r = 2000
 # 不要写成 ENV.prod.deploy_dir = .... 
 # 解析器的 bug 会导致将 ENV.prod.deploy_dir 增加到 [[ENV.local.'config.toml'.REGIONALS]] 内部
 [ENV.prod]
-DEPLOY_DIR = '/srv/app/{NAME}_prod'
+DEPLOY_DIR = '/srv/app/{{NAME}}_prod'
 
 [ENV.prod.'uwsgi.ini']
 processes = 4
 
 [ENV.prod.'config.toml'.SQLALCHEMY]
-URI = 'sqlite:///{DEPLOY_DIR}/pyape.sqlite'
+URI = 'sqlite:///{{DEPLOY_DIR}}/pyape.sqlite'
 
 [ENV.prod.'gunicorn.conf.py']
-bind = 'unix:{DEPLOY_DIR}/gunicorn.sock'
-pidfile = '{DEPLOY_DIR}/gunicorn.pid'
-accesslog = '{DEPLOY_DIR}/logs/access.log'
-errorlog = '{DEPLOY_DIR}/logs/error.log'
+bind = 'unix:{{DEPLOY_DIR}}/gunicorn.sock'
+pidfile = '{{DEPLOY_DIR}}/gunicorn.pid'
+accesslog = '{{DEPLOY_DIR}}/logs/access.log'
+errorlog = '{{DEPLOY_DIR}}/logs/error.log'
