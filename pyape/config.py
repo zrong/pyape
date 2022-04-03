@@ -10,10 +10,12 @@ pyape.config
 
 from pathlib import Path
 import json
-from statistics import mode
+import time
 from typing import Any, Union
 import tomli as tomllib
 import tomli_w
+
+from pyape.util.encrypt import Encrypt
 
 
 # 根据平台中的配置字符串，确定属于哪个平台
@@ -136,9 +138,14 @@ class RegionalConfig(object):
 class GlobalConfig(object):
     """ 全局配置文件，对应 config.toml """
 
-    # 全局变量，用于保存 config.json 载入的配置
-    cfg_data = None
-    regional = None
+    cfg_data: dict = None
+    """ 全局变量，用于保存 config.toml/config.json 中载入的配置。"""
+
+    regional: RegionalConfig = None
+    """ 如果 Pyape 框架启用了 Regional 机制，则保存 Regional 配置实例。"""
+
+    encrypter: Encrypt = None
+    """ 用于 Fernet 加解密对象。"""
 
     def __init__(self, work_dir: Path=None, cfg: Union[dict, str]='config.toml'):
         """ 初始化全局文件
@@ -234,6 +241,37 @@ class GlobalConfig(object):
                 self.setcfg(*args[1:], value=value, data=cur_data)
             else:
                 data[arg0] = value
+
+    def encode_token(self, expire: int=86400, ts: int=None, **values: dict) -> str:
+        """ 使用 Fernet 算法加密一组值为 token 用于鉴权。
+
+        :param expire: 过期时间，单位秒。 3600*24 = 86400。
+        :param ts: 过期时间戳，单位秒。若不提供则使用 当前时间+expire。
+
+        >>> encode_token(r=0, uid=1, nickname='超级管理员', usertype=50)
+        'b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c'
+        """
+        if ts is None:
+            ts = int(time.time()) + expire
+        if self.encrypter is None:
+            self.encrypter = Encrypt(self.getcfg('FLASK', 'SECRET_KEY'))
+        values['ts'] = ts
+        return self.encrypter.encrypt(json.dumps(values))
+
+    def decode_token(self, token: str) -> str:
+        """ 解密使用 encode_token 加密的字符串。
+
+        :param token: 需要解密的 token 字符串。
+
+        >>> decode_token('b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c')
+        {'r': 0, 'uid': 0, 'usertype': 50, 'status': 1, 'expires': False}
+        """
+        if self.encrypter is None:
+            self.encrypter = Encrypt(self.getcfg('FLASK', 'SECRET_KEY'))
+        tokenobj = json.loads(self.encrypter.decrypt(token))
+        # 指示是否过期
+        tokenobj['expires'] = tokenobj.get('ts') < int(time.time())
+        return PYConf(tokenobj)
 
     def init_regionals(self, data: Union[str, dict]='cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)

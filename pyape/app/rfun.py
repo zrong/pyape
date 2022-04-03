@@ -40,7 +40,7 @@ def regional_get(regional_cls, r, merge):
     """
     if r is None:
         return responseto('Param please!', code=401)
-    robj = gdb.session.get(regional_cls, r)
+    robj = gdb.session().get(regional_cls, r)
     if robj is None:
         return responseto('No regional %s!' % r, code=404)
 

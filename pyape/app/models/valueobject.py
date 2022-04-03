@@ -207,12 +207,12 @@ def del_vo_vidname(vo_cls, vid: int, name: str):
     """ 通过 vid 或者 name 删除一个 vo
     """
     try:
-        session = gdb.session(vo_cls.bind_key)
-        session.query(vo_cls).filter(or_(vo_cls.vid==vid, vo_cls.name==name)).delete()
-        session.commit()
+        dbs = gdb.session(vo_cls.bind_key)
+        dbs.query(vo_cls).filter(or_(vo_cls.vid==vid, vo_cls.name==name)).delete()
+        dbs.commit()
     except SQLAlchemyError as e:
         msg = 'valueobject.del_vo_vidname error: ' + str(e)
-        session.rollback()
+        dbs.rollback()
         logger.error(msg)
         return msg
     return None

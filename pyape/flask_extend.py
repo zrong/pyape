@@ -10,12 +10,39 @@ from decimal import Decimal
 
 import flask
 from flask import (Flask, Response, request)
+from flask.sessions import SecureCookieSessionInterface
 from werkzeug.datastructures import Headers
 from sqlalchemy.inspection import inspect
 
 from pyape.flask_redis import FlaskRedis
-from pyape.config import GlobalConfig, RegionalConfig
+from pyape.config import GlobalConfig, PYConf, RegionalConfig
 from pyape.db import SQLAlchemy
+
+
+class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
+    """ 修改 Flask 框架的默认 salt，并提供 Flask Session 的加解密功能。 """
+
+    def __init__(self) -> None:
+        self.salt = 'pyape-cookie-session'
+        super().__init__()
+
+    @classmethod
+    def decode_flask_cookie(cls, secret_key: str, cookie: str):
+        """ 解码 flask cookie-session 字符串。"""
+        pscsi = cls()
+        # get_signing_serializer 方法需要一个 Flask 实例，其中只需要包含 secret_key 即可。
+        fake_app: PYConf = PYConf(secret_key=secret_key)
+        serializer = pscsi.get_signing_serializer(fake_app)
+        return serializer.loads(cookie)
+
+    @classmethod
+    def encode_flask_cookie(cls, secret_key: str, cookie: dict):
+        """ 将 dict 编码成 flask cookie-session 字符串。"""
+        pscsi = cls()
+        # get_signing_serializer 方法需要一个 Flask 实例，其中只需要包含 secret_key 即可。
+        fake_app: PYConf = PYConf(secret_key=secret_key)
+        serializer = pscsi.get_signing_serializer(fake_app)
+        return serializer.dumps(cookie)
 
 
 class FlaskConfig(object):
@@ -89,8 +116,9 @@ class PyapeFlask(Flask):
     _gconf: GlobalConfig = None
     _gdb = None
     def __init__(self, *args, gconf: GlobalConfig, **kwargs):
-        self._gconf = gconf
         super().__init__(*args, **kwargs)
+        self._gconf = gconf
+        self.session_interface = PyapeSecureCookieSessionInterface()
 
     def log_exception(self, exc_info):
         self.logger.error('%s', dict(
@@ -312,6 +340,7 @@ class PyapeRedis(FlaskRedis):
             bind_key_redis = robj.get('bind_key_redis')
             clients[r] = rc_clients[bind_key_redis]
         return clients
+
 
 
 def flash_dict(d, category: str='message'):
