@@ -496,7 +496,7 @@ class SQLAlchemy(object):
         """
         return self.metadata(bind_key).tables[name]
 
-    def execute(self, sql, use_session: bool=False, bind_key: str=None) -> Result:
+    def execute(self, stmt, use_session: bool=False, bind_key: str=None) -> Result:
         """ 执行一个 SQL。支持 ORM 方式或者 CORE 方式。
         
         :param sql: 标准的 SQLAlchemy Select。
@@ -509,5 +509,5 @@ class SQLAlchemy(object):
         #     return connection.execute(sql)
         result: Result = None
         if use_session:
-            return self.session().execute(sql)
-        return self.engine(bind_key).connect().execute(sql)
+            return self.session().execute(stmt)
+        return self.engine(bind_key).connect().execute(stmt)

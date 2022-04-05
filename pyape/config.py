@@ -258,7 +258,7 @@ class GlobalConfig(object):
         values['ts'] = ts
         return self.encrypter.encrypt(json.dumps(values))
 
-    def decode_token(self, token: str) -> str:
+    def decode_token(self, token: str) -> PYConf:
         """ 解密使用 encode_token 加密的字符串。
 
         :param token: 需要解密的 token 字符串。
