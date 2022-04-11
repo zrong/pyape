@@ -507,7 +507,6 @@ class SQLAlchemy(object):
         # 使用下面的语法会报错 sqlite3.ProgrammingError: Cannot operate on a closed database.
         # with engine.connect() as connection:
         #     return connection.execute(sql)
-        result: Result = None
         if use_session:
             return self.session().execute(stmt)
         return self.engine(bind_key).connect().execute(stmt)

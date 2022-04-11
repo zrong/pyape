@@ -4,7 +4,7 @@ pyape.flask_extend
 
 对 Flask 框架进行扩展。
 """
-from typing import Callable
+from typing import Callable, Union
 from datetime import datetime
 from decimal import Decimal
 
@@ -16,7 +16,7 @@ from sqlalchemy.inspection import inspect
 
 from pyape.flask_redis import FlaskRedis
 from pyape.config import GlobalConfig, PYConf, RegionalConfig
-from pyape.db import SQLAlchemy
+from pyape.db import SQLAlchemy, DBManager
 
 
 class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
@@ -134,7 +134,11 @@ class PyapeFlask(Flask):
         
 
 class PyapeDB(SQLAlchemy):
-    """ 封装 pyape 使用的数据库方法。"""
+    """ 封装 pyape 使用的数据库方法。
+    
+    :param app: PyapaFlask 的实例。
+    :param dbinst: SQLAlchemy 或者 DBManager 的实例。
+    """
     _gconf: GlobalConfig = None
     _app: PyapeFlask = None
 
@@ -147,14 +151,21 @@ class PyapeDB(SQLAlchemy):
     # 保存根据 regional 进行分类的表定义
     __regional_table_cls: dict=None
 
-    def __init__(self, app: PyapeFlask):
+    def __init__(self, app: PyapeFlask, dbinst: Union[SQLAlchemy, DBManager]=None):
         self.__dynamic_table_cls = {}
         self.__regional_table_cls = {}
         self._app = app
         self._gconf = app._gconf
-        sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
-        sql_options = self._gconf.getcfg('SQLALCHEMY', 'ENGINE_OPTIONS')
-        super().__init__(URI=sql_uri, ENGINE_OPTIONS=sql_options, is_scoped=True, in_flask=True)
+
+        # 支持从一个已有的 dbinst 对象中共享 dbm 对象。用于项目中有多套 SQLAlchemy 的情况。
+        if isinstance(dbinst, SQLAlchemy):
+            super().__init__(dbm=dbinst.dbm, is_scoped=True, in_flask=True)
+        elif isinstance(dbinst, DBManager):
+            super().__init__(dbm=dbinst, is_scoped=True, in_flask=True)
+        else:
+            sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
+            sql_options = self._gconf.getcfg('SQLALCHEMY', 'ENGINE_OPTIONS')
+            super().__init__(URI=sql_uri, ENGINE_OPTIONS=sql_options, is_scoped=True, in_flask=True)
         self._app.logger.info(f'self.Session {self.Session}')
 
         @app.teardown_appcontext
@@ -350,3 +361,13 @@ def flash_dict(d, category: str='message'):
     for k, v in d.items():
         s.append(f'{k}: {", ".join(v)}')
     flask.flash(' '.join(s), category)
+
+
+def jinja_filter_strftimestamp(ts, fmt: str=None):
+    """ 将 timestamp 转换成为字符串。
+    """
+    # fmt = '%Y-%m-%d'
+    dt = datetime.fromtimestamp(ts)
+    if fmt is None:
+        return dt.isoformat()
+    return dt.strftime(fmt)

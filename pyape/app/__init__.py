@@ -15,12 +15,13 @@ import flask
 
 from flask_compress import Compress
 
-from pyape import uwsgiproxy
-from pyape import errors
+from pyape import uwsgiproxy, errors
 from pyape.config import GlobalConfig
 from pyape.cache import GlobalCache
 from pyape.logging import get_logging_handler, get_pyzog_handler
-from pyape.flask_extend import PyapeFlask, PyapeResponse, FlaskConfig, PyapeDB, PyapeRedis
+from pyape.flask_extend import PyapeFlask, PyapeResponse, \
+    FlaskConfig, PyapeDB, PyapeRedis, \
+    jinja_filter_strftimestamp
 
 
 # 全局配置对象
@@ -40,7 +41,7 @@ gcache: GlobalCache = None
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def init_db(pyape_app: PyapeFlask):
+def init_db(pyape_app: PyapeFlask, create_args: dict=None):
     """ 初始化 SQLAlchemy 数据库支持。
     """
     sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
@@ -49,11 +50,13 @@ def init_db(pyape_app: PyapeFlask):
     global gdb
     if gdb is not None:
         raise ValueError('gdb 不能重复定义！')
-    gdb = PyapeDB(app=pyape_app)
+    # 若传递了 dbinst 则使用其初始化 PyapeDB
+    dbinst = None if create_args is None else create_args.get('dbinst')
+    gdb = PyapeDB(app=pyape_app, dbinst=dbinst)
     pyape_app._gdb = gdb
 
 
-def init_redis(pyape_app: PyapeFlask):
+def init_redis(pyape_app: PyapeFlask, create_args: dict=None):
     """ 初始化 REDIS ，配置文件中包含 REDIS_URI 才进行初始化
     """
     redis_uri = pyape_app._gconf.getcfg('REDIS', 'URI')
@@ -65,7 +68,7 @@ def init_redis(pyape_app: PyapeFlask):
     grc = PyapeRedis(app=pyape_app)
 
 
-def init_logger(pyape_app: PyapeFlask):
+def init_logger(pyape_app: PyapeFlask, create_args: dict=None):
     """ 设置 Flask app 和 sqlalchemy 的logger
     """
     flasklogger = pyape_app.logger
@@ -92,7 +95,7 @@ def init_logger(pyape_app: PyapeFlask):
         log.addHandler(handler)
 
 
-def init_cache(pyape_app: PyapeFlask):
+def init_cache(pyape_app: PyapeFlask, create_args: dict=None):
     """ 初始化全局缓存对象。
     """
     global gcache
@@ -148,26 +151,37 @@ def _build_kwargs_for_app(gconf: GlobalConfig):
     return kwargs
 
 
+_default_create_args = dict(
+    FlaskClass=PyapeFlask,
+    ResponseClass=PyapeResponse,
+    ConfigClass=FlaskConfig,
+    error_handler=False,
+)
 def create_app(
         gconf: GlobalConfig,
-        FlaskClass=PyapeFlask,
-        ResponseClass=PyapeResponse,
-        ConfigClass=FlaskConfig,
-        error_handler: bool=False,
+        create_args: dict = {}
     ):
     """
     根据不同的配置创建 app。
 
     :param gconf: ``GlobalConfig`` 的实例。
-    :param FlaskClass: Flask 的子类。
-    :param ResponseClass: Flask Response 的子类。
-    :param ConfigClass:  对 flask.config 进行包装。
-    :param error_handler: 是否启用 ``Flask.register_error_handler``
-        接管 HTTP STATUS_CODE 处理。使用 ``pyape.errors`` 来接管。
+    :param create_args: 一个字典，其中包含下面的键。
+        FlaskClass: Flask 的子类。
+        ResponseClass: Flask Response 的子类。
+        ConfigClass:  对 flask.config 进行包装。
+        error_handler: 是否启用 ``Flask.register_error_handler``
+        接管 HTTP STATUS_CODE 处理。若值为 True，则使用 ``pyape.errors`` 来接管。
     """
-    kwargs = _build_kwargs_for_app(gconf)
+    _create_args = _default_create_args.copy()
+    if create_args is not None:
+        _create_args.update(create_args)
+    FlaskClass = _create_args['FlaskClass']
+    ResponseClass = _create_args['ResponseClass']
+    ConfigClass = _create_args['ConfigClass']
+    error_handler = _create_args['error_handler']
 
-    pyape_app = FlaskClass(__name__, gconf=gconf, **kwargs)
+    flask_init_kwargs = _build_kwargs_for_app(gconf)
+    pyape_app = FlaskClass(__name__, gconf=gconf, **flask_init_kwargs)
     pyape_app.response_class = ResponseClass
     pyape_app.config.from_object(ConfigClass(gconf.getcfg('FLASK')))
     if pyape_app.config.get('COMPRESS_ON'):
@@ -186,14 +200,16 @@ def _init_common(gconf: GlobalConfig=None, create_args: dict=None) -> PyapeFlask
     sys.modules[__name__].__dict__['gconfig'] = gconf
     flask.cli.load_dotenv()
 
-    pyape_app = create_app(gconf ,**create_args) if isinstance(create_args, dict) else create_app(gconf)
+    pyape_app = create_app(gconf, create_args)
+    # 增加自定义 jinja filter
+    pyape_app.add_template_filter(jinja_filter_strftimestamp, 'strftimestamp')
 
-    init_db(pyape_app)
-    init_redis(pyape_app)
+    init_db(pyape_app, create_args)
+    init_redis(pyape_app, create_args)
     # logger 可能会使用 redis，因此顺序在 redis 初始化之后
-    init_logger(pyape_app)
+    init_logger(pyape_app, create_args)
     # cache 可能会使用 redis，因此顺序在 redis 初始化之后
-    init_cache(pyape_app)
+    init_cache(pyape_app, create_args)
     
     return pyape_app
 
