@@ -36,7 +36,7 @@ grc: PyapeRedis = None
 # 全局缓存实例，pyape.cache.GlobalCache 的实例
 gcache: GlobalCache = None
 
-# 就是 flas.app.logger 放在这里不必引用 current_app，参考：
+# 就是 flask.app.logger 放在这里不必引用 current_app，参考：
 # https://flask.palletsprojects.com/en/1.1.x/logging/
 logger: logging.Logger = logging.getLogger(__name__)
 

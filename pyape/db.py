@@ -13,7 +13,7 @@ from threading import Lock
 from typing import Iterable, Union
 from sqlalchemy.schema import Table, MetaData
 from sqlalchemy.orm import DeclarativeMeta, declarative_base, sessionmaker, Session, scoped_session, Query
-from sqlalchemy.engine import Engine, create_engine, Result, make_url, URL
+from sqlalchemy.engine import Engine, Connection, create_engine, make_url, URL
 
 
 class Pagination(object):
@@ -164,10 +164,10 @@ class DefaultMeta(BindMetaMixin, DeclarativeMeta):
 
 
 class DBManager(object):
-    """ 管理 SQL 连接，创建和管理数据库 Engine，Session，Model
+    """ 管理 SQL 连接，创建和管理数据库 Engine，Session，Model。
     
-    :param URI: 提供数据库地址
-    :param dict kwargs: 提供数据库连接参数
+    :param URI: 提供数据库地址。
+    :param dict kwargs: 提供数据库连接参数。
     """
 
     default_bind_key: str = None
@@ -369,7 +369,8 @@ class SQLAlchemy(object):
     :param dbm: DBManager 的实例。
     :param URI: 若不提供 dbm 则使用 URI 数据新建 DBManager。
     :param is_scoped: 为线程安全，使用 scoped session。
-    :param in_flask: 是否在 Flask 框架内部。若在 Flask 内部使用，创建 Session 实例的时候会使用 scoped_session。
+    :param in_flask: 是否在 Flask 框架内部。若在 Flask 内部使用，
+        创建 Session 实例的时候会使用 scoped_session。
     """
     dbm: DBManager = None
     is_scoped: bool = True
@@ -414,6 +415,18 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
+    def engine(self, bind_key: str=None) -> Engine:
+        """ 从 DBManager 中获取对应的 engine 实例。
+
+        :param bind_key: 
+            详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
+        """
+        return self.dbm.get_engine(bind_key)
+
+    def connection(self, bind_key: str=None) -> Connection:
+        """ 调用 Engine 的 connect 放来了获取一个 connection 对象。"""
+        return self.engine(bind_key).connect()
+
     def session(self) -> Session:
         """ 获取一个 Session 对象。
         """
@@ -430,14 +443,6 @@ class SQLAlchemy(object):
         """ 获取对应 Model 的 metadata 实例
         """
         return self.Model(bind_key).metadata
-
-    def engine(self, bind_key: str=None) -> Engine:
-        """ 从 DBManager 中获取对应的 engine 实例
-
-        :param bind_key: 
-            详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
-        """
-        return self.dbm.get_engine(bind_key)
 
     def create_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
         """ 创建 table。
@@ -495,18 +500,3 @@ class SQLAlchemy(object):
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         return self.metadata(bind_key).tables[name]
-
-    def execute(self, stmt, use_session: bool=False, bind_key: str=None) -> Result:
-        """ 执行一个 SQL。支持 ORM 方式或者 CORE 方式。
-        
-        :param sql: 标准的 SQLAlchemy Select。
-        :param use_session: 是否使用 orm.Session，若为 False，则使用 Engine.execute。
-        :param str bind_key: 
-            详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
-        """
-        # 使用下面的语法会报错 sqlite3.ProgrammingError: Cannot operate on a closed database.
-        # with engine.connect() as connection:
-        #     return connection.execute(sql)
-        if use_session:
-            return self.session().execute(stmt)
-        return self.engine(bind_key).connect().execute(stmt)
