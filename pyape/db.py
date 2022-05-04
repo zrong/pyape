@@ -288,6 +288,15 @@ class DBManager(object):
                 from sqlalchemy.pool import NullPool
                 options['poolclass'] = NullPool
 
+            # 强制 SQLITE 支持支持外键
+            # https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#foreign-key-support
+            from sqlalchemy import event
+            @event.listens_for(Engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
+
         engine = create_engine(sa_url, **options)
 
         # options['poolclass'] = StaticPool
