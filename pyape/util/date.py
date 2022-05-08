@@ -67,7 +67,7 @@ class DateRange(Iterable):
             if len(parsed_date) > 2:
                 raise ValueError(f'提供的日期 {date_text} 不正确！')
             self.parsed_date = parsed_date
-            self.is_range = len(parsed_date) == 1
+            self.is_range = len(parsed_date) == 2
             if self.is_range:
                 if int(self.parsed_date[0]) > int(self.parsed_date[1]):
                     self.parsed_date = [self.parsed_date[1], self.parsed_date[0]]
@@ -91,10 +91,10 @@ class DateRange(Iterable):
             raise ValueError(f'提供的日期 {date_text} 长度不正确，仅支持 8/6/4 三种日期长度。')
 
     def __iter__(self) -> Iterator:
-        print(f'{self.date_type=}')
-        if self.date_type == 'date':
-            return iter(self.to_date_list())
-        return iter(self.to_month_list())
+        return iter(self.to_list())
+
+    def __len__(self) -> int:
+        return len(self.to_list())
 
     def __check_dupli(self, parsed_date: list[str]) -> list[str]:
         """ 删除重复值，int 为了确保日期是合法整数，str 是方便后面使用 strptime。"""
@@ -119,6 +119,12 @@ class DateRange(Iterable):
 
     def range_end(self, type_: Callable = str) -> Union[int, datetime, str]:
         return self.__range_star_or_end(1, type_)
+
+    def to_list(self) -> list[int]:
+        """ 根据当前 date_type 导出不同的 list。"""
+        if self.date_type == 'date':
+            return self.to_date_list()
+        return self.to_month_list()
 
     def to_date_list(self) -> list[int]:
         """ 导出一个 8 位 date 列表。
