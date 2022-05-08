@@ -47,7 +47,7 @@ def _get_vo_by_cache(r, name):
     """
     valueobj = gcache.getg(name, r)
     if valueobj is None:
-        vo = gdb.execute(select(ValueObject).filter_by(name=name), use_session=True).scalar()
+        vo = gdb.session().scalar(select(ValueObject).filter_by(name=name))
         if vo is not None:
             valueobj = vo.get_value()
             gcache.setg(name, valueobj, r)
