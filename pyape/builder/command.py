@@ -11,7 +11,13 @@ import click
 from invoke.exceptions import Exit
 
 from pyape.tpl import base_dir as pyape_tpl_dir
-from pyape.builder import get_pyape_toml, get_pyape_toml_file, MAIN_CONFIG_FILES, SUPERVISOR_TPL_FILES, MAIN_PROJECT_FILES
+from pyape.builder import (
+    get_pyape_toml,
+    get_pyape_toml_file,
+    MAIN_CONFIG_FILES,
+    SUPERVISOR_TPL_FILES,
+    MAIN_PROJECT_FILES,
+)
 from pyape.builder.conf import ConfigReplacer
 
 from fabric.connection import Connection
@@ -28,13 +34,24 @@ def check_pyape_toml(cwd: str, ctx: click.Context) -> dict:
     return cwd, pyape_conf
 
 
-def write_config_file(ctx: click.Context, env_name: str, pyape_conf: dict, tpl_name: str, work_dir: Path, tpl_dir: Path=None, target_postfix: str='', force: bool=True) -> None:
+def write_config_file(
+    ctx: click.Context,
+    env_name: str,
+    pyape_conf: dict,
+    tpl_name: str,
+    work_dir: Path,
+    tpl_dir: Path = None,
+    target_postfix: str = '',
+    force: bool = True,
+) -> None:
     """ 写入配置文件
     
     :param target_postfix: 配置文件的后缀
     """
     try:
-        replacer = ConfigReplacer(env_name, pyape_conf, work_dir=work_dir, tpl_dir=tpl_dir)
+        replacer = ConfigReplacer(
+            env_name, pyape_conf, work_dir=work_dir, tpl_dir=tpl_dir
+        )
         replacer.set_writer(tpl_name, force, target_postfix)
     except Exception as e:
         ctx.fail(e)
@@ -93,9 +110,24 @@ def main():
 
 
 @click.command(help='「本地」生成器，生成一个 Flask 可用的 SECRET_KEY，一个 NONCE 字符串，和一个加盐密码。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹，也就是复制目标文件夹。')
-@click.option('--password', type=click.STRING, help='返回加盐之后的 PASSWORD，需要提供密码，同时在 NAME 参数中提供一个盐值。')
-@click.option('--nonce', show_default=True, type=click.INT, required=False, default=8, help='返回一个 nonce 字符串。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹，也就是复制目标文件夹。',
+)
+@click.option(
+    '--password', type=click.STRING, help='返回加盐之后的 PASSWORD，需要提供密码，同时在 NAME 参数中提供一个盐值。'
+)
+@click.option(
+    '--nonce',
+    show_default=True,
+    type=click.INT,
+    required=False,
+    default=8,
+    help='返回一个 nonce 字符串。',
+)
 @click.argument('name', nargs=-1)
 @click.pass_context
 def gen(ctx, name, cwd, password: str, nonce: int):
@@ -106,6 +138,7 @@ def gen(ctx, name, cwd, password: str, nonce: int):
     cwd = Path(cwd)
     values = {}
     from pyape.util import gen
+
     values['secret-key'] = gen.gen_secret_key()
     if password:
         if len(name) < 1:
@@ -117,7 +150,13 @@ def gen(ctx, name, cwd, password: str, nonce: int):
 
 
 @click.command(help='「本地」复制 pyape 配置文件到当前项目中')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹，也就是复制目标文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹，也就是复制目标文件夹。',
+)
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
 @click.option('--rename', '-R', default=False, is_flag=True, help='若目标文件存在则重命名')
 @click.argument('name', nargs=-1)
@@ -129,14 +168,22 @@ def copy(name, cwd, force, rename):
     else:
         for key in name:
             if not key in MAIN_PROJECT_FILES.keys():
-                st = click.style('仅支持以下名称： {0}'.format(' '.join(MAIN_PROJECT_FILES.keys())), fg='red')
+                st = click.style(
+                    '仅支持以下名称： {0}'.format(' '.join(MAIN_PROJECT_FILES.keys())), fg='red'
+                )
                 click.echo(st, err=True)
                 continue
             copytplfile(pyape_tpl_dir, cwd, key, MAIN_PROJECT_FILES[key], force, rename)
 
 
 @click.command(help='「本地」初始化 pyape 项目')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--force', '-F', default=False, is_flag=True, help='覆盖已存在的文件')
 def init(cwd, force):
     cwd = Path(cwd)
@@ -145,7 +192,13 @@ def init(cwd, force):
 
 
 @click.command(help='「本地」创建 pyape 项目运行时必须的环境，例如数据库建立等。需要自行在项目根文件夹创建 setup.py。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.pass_context
 def setup(ctx, cwd):
     cwd = Path(cwd)
@@ -156,38 +209,65 @@ def setup(ctx, cwd):
     if not cwd.joinpath(setup_py).exists():
         ctx.fail('Please create a file named "setup.py" in project root directory.')
     import sys
+
     sys.path.insert(0, cwd.as_posix())
     from importlib.util import spec_from_file_location, module_from_spec
+
     spec = spec_from_file_location('pyape.setup', setup_py)
     mod = module_from_spec(spec)
     spec.loader.exec_module(mod)
 
+
 @click.command(help='「远程」展示 uwsgi 的运行情况。')
-@click.option('--frequency', '-F', default=1, type=int, help='Refresh frequency in seconds')
+@click.option(
+    '--frequency', '-F', default=1, type=int, help='Refresh frequency in seconds'
+)
 @click.argument('address', nargs=1)
 def top(address, frequency):
     import pyape.uwsgitop
+
     pyape.uwsgitop.call(address, frequency)
 
 
 @click.command(help='「本地」生成配置文件。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--env_postfix', '-P', is_flag=True, help='在生成的配置文件名称末尾加上环境名称后缀。')
 @click.option('--force', '-F', is_flag=True, help='是否强制替换已存在的文件。')
 @click.argument('files', nargs=-1, type=click.Choice(MAIN_CONFIG_FILES))
 @click.pass_context
-def config(ctx: click.Context, env: str, cwd: str, env_postfix: bool, force:bool, files: tuple):
+def config(
+    ctx: click.Context, env: str, cwd: str, env_postfix: bool, force: bool, files: tuple
+):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     # 若没有提供参数就生成所有的配置文件
     config_files = files if len(files) > 0 else MAIN_CONFIG_FILES
     for tpl_name in config_files:
-        write_config_file(ctx, env, pyape_conf, tpl_name, work_dir=cwd, target_postfix=f'.{env}' if env_postfix else '', force=force)
-        
+        write_config_file(
+            ctx,
+            env,
+            pyape_conf,
+            tpl_name,
+            work_dir=cwd,
+            target_postfix=f'.{env}' if env_postfix else '',
+            force=force,
+        )
 
 
 @click.command(help='「本地」生成 Supervisor 需要的配置文件。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--force', '-F', is_flag=True, help='是否强制替换已存在的文件。')
 @click.pass_context
@@ -197,7 +277,8 @@ def supervisor(ctx, cwd, env, force):
         write_config_file(ctx, env, pyape_conf, tpl_name, work_dir=cwd, force=force)
 
 
-#---------------------------- 远程部署相关
+# ---------------------------- 远程部署相关
+
 
 def _build_conn(env_name: str, pyape_conf: dict, cwd: Path) -> Connection:
     replacer = ConfigReplacer(env_name, pyape_conf, cwd)
@@ -207,7 +288,13 @@ def _build_conn(env_name: str, pyape_conf: dict, cwd: Path) -> Connection:
 
 
 @click.command(help='「远程」生成并上传配置文件到远程服务器。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--force', '-F', is_flag=True, help='是否强制覆盖已有的配置文件。')
 @click.pass_context
@@ -216,12 +303,19 @@ def putconf(ctx, cwd, env, force):
     conn = _build_conn(env, pyape_conf, cwd)
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
+
     d = Deploy(env, pyape_conf, conn, cwd)
     d.put_config(force=force)
 
 
 @click.command(help='「远程」部署远程服务器的虚拟环境。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--init', '-I', is_flag=True, help='是否初始化虚拟环境。')
 @click.argument('upgrade', nargs=-1)
@@ -231,6 +325,7 @@ def venv(ctx, cwd, env, init: bool, upgrade: tuple):
     conn = _build_conn(env, pyape_conf, cwd)
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
+
     d = Deploy(env, pyape_conf, conn, cwd)
     if init:
         d.init_remote_venv()
@@ -241,7 +336,13 @@ def venv(ctx, cwd, env, init: bool, upgrade: tuple):
 
 
 @click.command(help='「远程」部署项目到远程服务器。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def deploy(ctx, cwd, env):
@@ -249,13 +350,20 @@ def deploy(ctx, cwd, env):
     conn = _build_conn(env, pyape_conf, cwd)
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
+
     d = Deploy(env, pyape_conf, conn, cwd)
     d.rsync(exclude=pyape_conf['RSYNC_EXCLUDE'])
     d.put_config(force=True)
 
 
 @click.command(help='「远程」在服务器上启动项目进程。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def start(ctx, cwd, env):
@@ -264,6 +372,7 @@ def start(ctx, cwd, env):
 
     try:
         from pyape.builder.fabric import GunicornDeploy as Deploy
+
         d = Deploy(env, pyape_conf, conn, cwd)
         d.start()
     except Exit as e:
@@ -271,7 +380,13 @@ def start(ctx, cwd, env):
 
 
 @click.command(help='「远程」在服务器上停止项目进程。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def stop(ctx, cwd, env):
@@ -279,12 +394,19 @@ def stop(ctx, cwd, env):
     conn = _build_conn(env, pyape_conf, cwd)
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
+
     d = Deploy(env, pyape_conf, conn, cwd)
     d.stop()
 
 
 @click.command(help='「远程」在服务器上重载项目进程。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def reload(ctx, cwd, env):
@@ -292,12 +414,19 @@ def reload(ctx, cwd, env):
     conn = _build_conn(env, pyape_conf, cwd)
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
+
     d = Deploy(env, pyape_conf, conn, cwd)
     d.reload()
 
 
 @click.command(help='「远程」在服务器上部署代码，然后执行重载。也就是 deploy and reload 的组合。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def dar(ctx, cwd, env):
@@ -309,7 +438,13 @@ def dar(ctx, cwd, env):
 
 
 @click.command(help='「远程」打印所有的过期的 python package。')
-@click.option('--cwd', '-C', type=click.Path(file_okay=False, exists=True), default=Path.cwd(), help='工作文件夹。')
+@click.option(
+    '--cwd',
+    '-C',
+    type=click.Path(file_okay=False, exists=True),
+    default=Path.cwd(),
+    help='工作文件夹。',
+)
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.pass_context
 def pipoutdated(ctx, cwd, env):
@@ -317,6 +452,7 @@ def pipoutdated(ctx, cwd, env):
     conn = _build_conn(env, pyape_conf, cwd)
 
     from pyape.builder.fabric import GunicornDeploy as Deploy
+
     d = Deploy(env, pyape_conf, conn, cwd)
     d.pipoutdated()
 
