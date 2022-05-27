@@ -201,6 +201,17 @@ class DateRange(Iterable):
             return [m for m in month if m <= self.last_month]
         return month
 
+    def to_year_list(self) -> list[int]:
+        """ 导出一个 4 为的 year 列表。
+
+        :return list[int]: 返回 %Y 的整数形式列表。
+        """
+        month_list = self.to_month_list()
+        year_list = [int(month/100) for month in month_list]
+        # 去重
+        return list(set(year_list))
+
+
 
 def date_interval(
     date1: Union[int, datetime], date2: Union[int, datetime], fmt: str = '%Y%m%d'
@@ -256,7 +267,7 @@ def gen_month(year: int, start: int = 1, end: int = 12, type_: Callable = int) -
     return [type_(f'{year}{md:02}') for md in range(start, end + 1)]
 
 
-def from_month(month_text: str, last_month: int = None) -> list[int]:
+def from_month(month_text: str, last_month: int = None, use_year: bool=False) -> list[int]:
     """ 根据提供的字符串获取日期列表。
 
     :param month_text: 月份字符串
@@ -267,10 +278,13 @@ def from_month(month_text: str, last_month: int = None) -> list[int]:
         多月：202012,202103
         月范围：202009-20210
     :param last_month: 停止在提供的这个月。
+    :param year_list: 返回年份列表而不是月份列表。
     :raise ValueError: 如果月份检测不合格抛出 ValueError。
     :return list[int]: 返回 %Y%m 的整数形式列表。
     """
     dr = DateRange(month_text, last_month)
+    if use_year:
+        return dr.to_year_list()
     return dr.to_month_list()
 
 

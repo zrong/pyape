@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Union
 
-from flask import (request, jsonify, make_response, send_file)
+from flask import request, jsonify, make_response, send_file
 from sqlalchemy.orm import Query
 
 from pyape.app import gdb, logger
@@ -70,9 +70,17 @@ def get_request_values(*args, replaceobj=None, defaultvalue={}, request_key='jso
     return dict(defaultvalue, **dict(rinfo, **rdata))
 
 
-def responseto(message: str=None, error: bool=None, code: int=None, data: dict=None,
-    replaceobj: dict=None, replaceobj_key_only: bool=False, return_dict: bool=False,
-    bind_key: str=None, **kwargs):
+def responseto(
+    message: str = None,
+    error: bool = None,
+    code: int = None,
+    data: dict = None,
+    replaceobj: dict = None,
+    replaceobj_key_only: bool = False,
+    return_dict: bool = False,
+    bind_key: str = None,
+    **kwargs
+):
     """ 封装 json 响应
     
     :param message: 错误消息，若提供则默认 error 为 True
@@ -160,14 +168,22 @@ def get_min_max_value_query(query, value_column, min_value=None, max_value=None)
     min_value = parse_float(min_value)
     max_value = parse_float(max_value)
     if min_value is not None:
-        query = query.filter(value_column >= min_value*100)
+        query = query.filter(value_column >= min_value * 100)
     if max_value is not None:
-        query = query.filter(value_column <= max_value*100)
+        query = query.filter(value_column <= max_value * 100)
     return query
 
 
-def get_page_response(query: Union[Query, dict], page: int, per_page: int,
-        itemskey, return_method=None, replaceobj=None, replaceobj_key_only=False, **kwargs):
+def get_page_response(
+    query: Union[Query, dict],
+    page: int,
+    per_page: int,
+    itemskey,
+    return_method=None,
+    replaceobj=None,
+    replaceobj_key_only=False,
+    **kwargs
+):
     """ 获取一个多页响应对象
 
     :param query: 查询对象，或者直接返回的对象
@@ -185,29 +201,52 @@ def get_page_response(query: Union[Query, dict], page: int, per_page: int,
     if isinstance(query, Query):
         try:
             pagi: Pagination = Pagination.paginate(query, int(page), int(per_page))
-            data = dict(page=pagi.page, prev_num=pagi.prev_num, next_num=pagi.next_num,
-                        has_next=pagi.has_next, has_prev=pagi.has_prev, pages=pagi.pages,
-                        total=pagi.total, per_page=pagi.per_page, error=False, code=200)
+            data = dict(
+                page=pagi.page,
+                prev_num=pagi.prev_num,
+                next_num=pagi.next_num,
+                has_next=pagi.has_next,
+                has_prev=pagi.has_prev,
+                pages=pagi.pages,
+                total=pagi.total,
+                per_page=pagi.per_page,
+                error=False,
+                code=200,
+            )
             if callable(return_method):
                 data[itemskey] = return_method(pagi.items)
                 return data
             elif return_method == 'model':
-                data[itemskey] = gdb.to_response_data(pagi.items, replaceobj, replaceobj_key_only)
+                data[itemskey] = gdb.to_response_data(
+                    pagi.items, replaceobj, replaceobj_key_only
+                )
                 return data
             data[itemskey] = pagi.items
         except Exception as e:
             logger.critical('re2fun.get_page_response error: %s', str(e))
             return responseto(message=str(e), error=True, code=500)
     else:
-        data = dict(page=page, prev_num=1, next_num=1,
-            has_next=False, has_prev=False, 
-            pages=1, total=0, per_page=per_page, 
-            error=False, code=200)
+        data = dict(
+            page=page,
+            prev_num=1,
+            next_num=1,
+            has_next=False,
+            has_prev=False,
+            pages=1,
+            total=0,
+            per_page=per_page,
+            error=False,
+            code=200,
+        )
         data[itemskey] = query
-    return responseto(**data, replaceobj=replaceobj, replaceobj_key_only=replaceobj_key_only, **kwargs)
+    return responseto(
+        **data, replaceobj=replaceobj, replaceobj_key_only=replaceobj_key_only, **kwargs
+    )
 
 
-def get_download_response(filepath, filename=None, content_type=None, inline=False):
+def get_download_response(
+    filepath: Path, filename: str = None, content_type: str = None, inline: bool = False
+):
     """
     获取一个下载文件的响应
     for jquery.fileDownload, see:
@@ -225,11 +264,13 @@ def get_download_response(filepath, filename=None, content_type=None, inline=Fal
         filename = filepath.name
 
     filepath_string = str(filepath.resolve())
-    logger.info('get_download_response. filepath_string:%s', filepath_string)
+    logger.info(f'get_download_response. filepath_string:{filepath_string}')
 
-    response = make_response(send_file(filepath_string, as_attachment=True, attachment_filename=filename))
+    response = make_response(
+        send_file(filepath_string, as_attachment=True, attachment_filename=filename)
+    )
     response.headers['Set-Cookie'] = 'fileDownload=true; path=/'
-    content_disposition =  'inline' if inline else 'attachment; filename=%s' % filename
+    content_disposition = 'inline' if inline else f'attachment; filename={filename}'
     response.headers['Content-Disposition'] = content_disposition
 
     if content_type is not None:
