@@ -30,16 +30,45 @@ DEPLOY_DIR = '/srv/app/{{NAME}}'
 # {{SQLALCHEMY_URI}} 数据库地址和密码
 #
 # 亦可自行增加环境变量，保证配置文件中的变量名称相同即可
-REPLACE_ENVIRON = ['ADMIN_NAME', 'ADMIN_PASSWORD', 'SECRET_KEY', 'SQLALCHEMY_URI']
+REPLACE_ENVIRON = [
+    'ADMIN_NAME',
+    'ADMIN_PASSWORD',
+    'SECRET_KEY',
+    'SQLALCHEMY_URI',
+]
 
 # 用于 deploy 上传时排除本地文件
 RSYNC_EXCLUDE = [
-    '.DS_Store', '*.pyc', 'fab*', '__pycache__', '.pytest_cache',
-    '.vscode', '*.code-workspace', '*.swp', '*.iml', 'node_modules',
-    '.git', '.pyenv', 'venv', '.gitignore', 
-    'wiki', 'output', 'tests', 'logs', 'wechat_sdk', 'flask_sqlalchemy',
-    '*.jinja2', '*.dot', '*.json', '*.toml', '*.sqlite', '*.db',
-    'config.*', 'uwsgi.*', '*.service', 'gunicorn.*'
+    '.DS_Store',
+    '*.pyc',
+    'fab*',
+    '__pycache__',
+    '.pytest_cache',
+    '.vscode',
+    '*.code-workspace',
+    '*.swp',
+    '*.iml',
+    'node_modules',
+    '.git',
+    '.pyenv',
+    'venv',
+    '.gitignore',
+    'wiki',
+    'output',
+    'tests',
+    'logs',
+    'wechat_sdk',
+    'flask_sqlalchemy',
+    '*.jinja2',
+    '*.dot',
+    '*.json',
+    '*.toml',
+    '*.sqlite',
+    '*.db',
+    'config.*',
+    'uwsgi.*',
+    '*.service',
+    'gunicorn.*',
 ]
 
 # 用于 fabric 进行远程部署时候的配置
@@ -79,7 +108,6 @@ FLASK_ENV = 'production'
 FLASK_RUN_PORT = 5000
 SQLALCHEMY_WARN_20 = 1
 
-
 # gunicorn.conf.py 的基本配置文件内容，可在 env 中进行覆盖
 ['gunicorn.conf.py']
 wsgi_app = 'wsgi:{{NAME}}_app'
@@ -89,6 +117,12 @@ umask = 0
 daemon = true
 capture_output = true
 
+# gunicorn_nginx.conf 的基本配置文件内容，可在 env 中进行覆盖
+['gunicorn_nginx.conf']
+# gunicorn_nginx.conf 中配置的 bind 必须与 gunicorn.conf.py 中完全相同
+name = '{{NAME}}'
+bind = '127.0.0.1:5001'
+location = '/'
 
 # uwsgi.ini 基本配置文件内容
 ['uwsgi.ini']
@@ -226,3 +260,8 @@ bind = 'unix:{{DEPLOY_DIR}}/gunicorn.sock'
 pidfile = '{{DEPLOY_DIR}}/gunicorn.pid'
 accesslog = '{{DEPLOY_DIR}}/logs/access.log'
 errorlog = '{{DEPLOY_DIR}}/logs/error.log'
+
+[ENV.prod.'gunicorn_nginx.conf']
+# gunicorn_nginx.conf 中配置的 bind 必须与 gunicorn.conf.py 中完全相同
+bind = 'unix:{{DEPLOY_DIR}}/gunicorn.sock'
+location = '/api'

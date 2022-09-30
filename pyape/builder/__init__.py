@@ -21,7 +21,7 @@ MAIN_PROJECT_FILES = {
     'gitignore': '.gitignore',
 }
 
-MAIN_CONFIG_FILES = ['.env', 'uwsgi.ini', 'gunicorn.conf.py', 'config.toml']
+MAIN_CONFIG_FILES = ['config.toml', '.env', 'uwsgi.ini', 'gunicorn.conf.py', 'gunicorn_nginx.conf']
 SUPERVISOR_TPL_FILES = ['supervisor_program.conf', 'supervisord.service', 'supervisord.conf']
 
 
