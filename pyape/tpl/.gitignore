@@ -141,7 +141,10 @@ cython_debug/
 *.db
 *.sqlite
 *.sqlite.*
-.vscode/
 *.zip
 *.code-workspace
+*.ini
 supervisor*
+gunicorn*
+config.toml
+.vscode/

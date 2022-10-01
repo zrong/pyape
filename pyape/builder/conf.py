@@ -84,7 +84,7 @@ class ConfigWriter(object):
 
     def write_config_file(self, force: bool=True):
         """ 写入配置文件
-        :param force: 若 force 为 False，则仅当文件不存在的时候才写入
+        :param force: 若 force 为 False，则仅当文件不存在的时候才写入。
         """
         if not force and self.dst_file.exists():
             return
