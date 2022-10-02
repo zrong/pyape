@@ -13,48 +13,7 @@ from typing import Any, Optional
 import tomli as tomllib
 import tomli_w
 from pyape.tpl import base_dir as pyape_tpl_dir
-
-
-def merge_dict(x: dict, y: dict, z: dict=None) -> dict:
-    """ 合并 x 和 y 两个 dict
-    1. 用 y 的同 key 值覆盖 x 的值
-    2. y 中的新键名（x 中同级不存在）增加到 x 中
-    返回一个新的 dict，不修改 x 和 y
-    :param x: x 被 y 覆盖
-    :param y: y 覆盖 x
-    :return: dict
-    """
-    if z is None:
-        z = {}
-    # 以 x 的键名为标准，用 y 中包含的 x 键名覆盖 x 中的值
-    for xk, xv in x.items():
-        yv = y.get(xk, None)
-        newv = None
-        if isinstance(xv, dict):
-            newv = xv.copy()
-            # 对于 dict 执行递归替换
-            if isinstance(yv, dict):
-                z[xk] = {}
-                newv = merge_dict(newv, yv, z[xk])
-            # 对于 list 直接进行浅复制
-            elif isinstance(yv, list):
-                newv = yv.copy()
-            # 对于标量值（非 None）则直接替换
-            elif yv is not None:
-                newv = yv
-        else:
-            newv = xv.copy() if isinstance(xv, list) else xv
-            if isinstance(yv, dict) or isinstance(yv, list):
-                newv = yv.copy()
-            elif yv is not None:
-                newv = yv
-        z[xk] = newv
-    
-    # 将 y 中有但 x 中没有的键加入 z
-    for yk, yv in y.items():
-        if x.get(yk, None) is None:
-            z[yk] = yv
-    return z
+from pyape.config import merge_dict
 
 
 class ConfigWriter(object):

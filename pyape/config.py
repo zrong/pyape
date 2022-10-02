@@ -27,16 +27,60 @@ PlATFORMS = {
 }
 
 
-class PYConf(dict):
-    """基于 Python dict 的配置文件。
+def merge_dict(x: dict, y: dict, z: dict=None) -> dict:
+    """ 合并 x 和 y 两个 dict。
 
-    dict 默认不适合当作配置文件对象使用。如要有下面几点不便：
+    1. 用 y 的同 key 值覆盖 x 的值。
+    2. y 中的新键名（x 中同级不存在）增加到 x 中。
+    
+    返回一个新的 dict，不修改 x 和 y。
+
+    :param x: x 被 y 覆盖。
+    :param y: y 覆盖 x。
+    :return: dict
+    """
+    if z is None:
+        z = {}
+    # 以 x 的键名为标准，用 y 中包含的 x 键名覆盖 x 中的值
+    for xk, xv in x.items():
+        yv = y.get(xk, None)
+        newv = None
+        if isinstance(xv, dict):
+            newv = xv.copy()
+            # 对于 dict 执行递归替换
+            if isinstance(yv, dict):
+                z[xk] = {}
+                newv = merge_dict(newv, yv, z[xk])
+            # 对于 list 直接进行浅复制
+            elif isinstance(yv, list):
+                newv = yv.copy()
+            # 对于标量值（非 None）则直接替换
+            elif yv is not None:
+                newv = yv
+        else:
+            newv = xv.copy() if isinstance(xv, list) else xv
+            if isinstance(yv, dict) or isinstance(yv, list):
+                newv = yv.copy()
+            elif yv is not None:
+                newv = yv
+        z[xk] = newv
+    
+    # 将 y 中有但 x 中没有的键加入 z
+    for yk, yv in y.items():
+        if x.get(yk, None) is None:
+            z[yk] = yv
+    return z
+
+
+class Dicto(dict):
+    """基于 Python dict 的配置对象。Dicto 意味着 dict object。
+
+    dict 默认不适合当作配置对象使用。如要有下面几点不便：
 
     #. 对于不存在的 key，会 raise KeyError 错误；
     #. dict不能使用 ``.`` 语法访问。
 
-    :class:`PYConf` 解决了这些问题，还另外提供了一些方法在使用上更加方便。
-
+    :class:`Dicto` 解决了这些问题，还另外提供了一些方法在使用上更加方便。
     """
 
     def __missing__(self, key):
@@ -55,17 +99,15 @@ class PYConf(dict):
         """从一个已经存在的 dict 中复制所有的值。
 
         :param adict: 被复制的 dict。
-        :type adict: dict
+        :type adict: dict。
         :param parent:  复制到哪个父对象。
                         若为 None 则复制到 self 。
-        :type parent: PYConf
-
         """
         if not parent:
             parent = self
         for k,v in adict.items():
             if isinstance(v, dict):
-                vconf = PYConf(v)
+                vconf = Dicto(v)
                 self.copy_from_dict(v, vconf)
                 parent[k] = vconf
             else:
@@ -258,7 +300,7 @@ class GlobalConfig(object):
         values['ts'] = ts
         return self.encrypter.encrypt(json.dumps(values))
 
-    def decode_token(self, token: str) -> PYConf:
+    def decode_token(self, token: str) -> Dicto:
         """ 解密使用 encode_token 加密的字符串。
 
         :param token: 需要解密的 token 字符串。
@@ -271,7 +313,7 @@ class GlobalConfig(object):
         tokenobj = json.loads(self.encrypter.decrypt(token))
         # 指示是否过期
         tokenobj['expires'] = tokenobj.get('ts') < int(time.time())
-        return PYConf(tokenobj)
+        return Dicto(tokenobj)
 
     def init_regionals(self, data: Union[str, dict]='cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)

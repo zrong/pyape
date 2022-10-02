@@ -15,7 +15,7 @@ from werkzeug.datastructures import Headers
 from sqlalchemy.inspection import inspect
 
 from pyape.flask_redis import FlaskRedis
-from pyape.config import GlobalConfig, PYConf, RegionalConfig
+from pyape.config import GlobalConfig, Dicto, RegionalConfig
 from pyape.db import SQLAlchemy, DBManager
 
 
@@ -31,7 +31,7 @@ class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
         """ 解码 flask cookie-session 字符串。"""
         pscsi = cls()
         # get_signing_serializer 方法需要一个 Flask 实例，其中只需要包含 secret_key 即可。
-        fake_app: PYConf = PYConf(secret_key=secret_key)
+        fake_app: Dicto = Dicto(secret_key=secret_key)
         serializer = pscsi.get_signing_serializer(fake_app)
         return serializer.loads(cookie)
 
@@ -40,7 +40,7 @@ class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
         """ 将 dict 编码成 flask cookie-session 字符串。"""
         pscsi = cls()
         # get_signing_serializer 方法需要一个 Flask 实例，其中只需要包含 secret_key 即可。
-        fake_app: PYConf = PYConf(secret_key=secret_key)
+        fake_app: Dicto = Dicto(secret_key=secret_key)
         serializer = pscsi.get_signing_serializer(fake_app)
         return serializer.dumps(cookie)
 

@@ -12,7 +12,13 @@ Pyape 是我在开发 Flask 应用程序过程中积累的一个开发框架。�
 我将开发 Web 以及 API 应用程序过程中积累的一些好用的工具和常用功能进行了简单的封装，整合在一起，
 方便快速启动一个新项目。
 
-**Pyape 的特点如下：**
+PYAPE 的完整文档： https://pyape.rtfd.io/
+
+PYAPE 的 github 主页： https://github.com/zrong/pyape
+
+PYAPE 我的博客上的页面： https://blog.zengrong.net/pyape/
+
+**PYAPE 的特点如下：**
 
 集成命令行
 ---------------
