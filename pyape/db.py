@@ -12,7 +12,14 @@ from threading import Lock
 
 from typing import Iterable, Union
 from sqlalchemy.schema import Table, MetaData
-from sqlalchemy.orm import DeclarativeMeta, declarative_base, sessionmaker, Session, scoped_session, Query
+from sqlalchemy.orm import (
+    DeclarativeMeta,
+    declarative_base,
+    sessionmaker,
+    Session,
+    scoped_session,
+    Query,
+)
 from sqlalchemy.engine import Engine, Connection, create_engine, make_url, URL
 
 
@@ -39,7 +46,13 @@ class Pagination(object):
         self.items = items
 
     @classmethod
-    def paginate(cls, qry: Query, page: int=None, per_page: int=None, max_per_page: int=None):
+    def paginate(
+        cls,
+        qry: Query,
+        page: int = None,
+        per_page: int = None,
+        max_per_page: int = None,
+    ):
         """ from flask_sqlalchemy
         Returns ``per_page`` items from page ``page``.
 
@@ -77,8 +90,9 @@ class Pagination(object):
 
     def prev(self):
         """Returns a :class:`Pagination` object for the previous page."""
-        assert self.query is not None, 'a query object is required ' \
-                                       'for this method to work'
+        assert self.query is not None, (
+            'a query object is required ' 'for this method to work'
+        )
         return self.__class__.paginate(self.query, self.page - 1, self.per_page)
 
     @property
@@ -95,8 +109,9 @@ class Pagination(object):
 
     def next(self):
         """Returns a :class:`Pagination` object for the next page."""
-        assert self.query is not None, 'a query object is required ' \
-                                       'for this method to work'
+        assert self.query is not None, (
+            'a query object is required ' 'for this method to work'
+        )
         return self.__class__.paginate(self.query, self.page + 1, self.per_page)
 
     @property
@@ -111,8 +126,7 @@ class Pagination(object):
             return None
         return self.page + 1
 
-    def iter_pages(self, left_edge=2, left_current=2,
-                   right_current=5, right_edge=2):
+    def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
         """Iterates over the page numbers in the pagination.  The four
         parameters control the thresholds how many numbers should be produced
         from the sides.  Skipped page numbers are represented as `None`.
@@ -138,10 +152,14 @@ class Pagination(object):
         """
         last = 0
         for num in range(1, self.pages + 1):
-            if num <= left_edge or \
-               (num > self.page - left_current - 1 and
-                num < self.page + right_current) or \
-               num > self.pages - right_edge:
+            if (
+                num <= left_edge
+                or (
+                    num > self.page - left_current - 1
+                    and num < self.page + right_current
+                )
+                or num > self.pages - right_edge
+            ):
                 if last + 1 != num:
                     yield None
                 yield num
@@ -150,10 +168,7 @@ class Pagination(object):
 
 class BindMetaMixin(type):
     def __init__(cls, name: str, bases, d):
-        bind_key = (
-            d.pop('__bind_key__', None)
-            or getattr(cls, '__bind_key__', None)
-        )
+        bind_key = d.pop('__bind_key__', None) or getattr(cls, '__bind_key__', None)
         super(BindMetaMixin, cls).__init__(name, bases, d)
         if bind_key is not None and getattr(cls, '__table__', None) is not None:
             cls.__table__.info['bind_key'] = bind_key
@@ -190,7 +205,9 @@ class DBManager(object):
     # 保存所有的 Model class
     __model_classes: dict = None
 
-    def __init__(self, URI: Union[dict, str], ENGINE_OPTIONS: dict=None, **kwargs: dict) -> None:
+    def __init__(
+        self, URI: Union[dict, str], ENGINE_OPTIONS: dict = None, **kwargs: dict
+    ) -> None:
         self.__engines = {}
         self.__binds = {}
         self.__model_classes = {}
@@ -202,14 +219,14 @@ class DBManager(object):
     def Models(self) -> Iterable:
         """ 使用 set 形式返回所有的 Model。"""
         return self.__model_classes.values()
-        
+
     @property
     def bind_keys(self) -> Iterable:
         """ 使用 set 形式返回所有的 bind_key。若只有一个数据库，
         返回的是 ``(None,)`` 。
         """
         return self.__model_classes.keys()
-        
+
     def __build_binds(self) -> None:
         view = None
         if isinstance(self.URI, str):
@@ -218,16 +235,14 @@ class DBManager(object):
         else:
             view = self.URI.items()
             self.default_bind_key = list(self.URI.keys())[0]
-            
+
         for name, uri in view:
             self.__add_bind(name, uri)
 
         self.Session_Factory = sessionmaker(
-            binds=self.__binds,
-            autoflush=False,
-            future=True
+            binds=self.__binds, autoflush=False, future=True
         )
-        
+
     def __add_bind(self, bind_key: str, uri: str) -> bool:
         Model = self.set_Model(bind_key)
         if self.__binds.get(Model) is None:
@@ -235,7 +250,7 @@ class DBManager(object):
             self.__binds[Model] = engine
             return True
         return False
-        
+
     def __set_engine(self, bind_key: str, uri: str) -> None:
         sa_url: URL = make_url(uri)
 
@@ -269,6 +284,7 @@ class DBManager(object):
                 detected_in_memory = True
 
                 from sqlalchemy.pool import StaticPool
+
                 options['poolclass'] = StaticPool
                 if 'connect_args' not in options:
                     options['connect_args'] = {}
@@ -278,14 +294,17 @@ class DBManager(object):
                 # we go to memory and the pool size was explicitly set
                 # to 0 which is fail.  Let the user know that
                 if pool_size == 0:
-                    raise RuntimeError('SQLite in memory database with an '
-                                       'empty queue not possible due to data '
-                                       'loss.')
+                    raise RuntimeError(
+                        'SQLite in memory database with an '
+                        'empty queue not possible due to data '
+                        'loss.'
+                    )
             # if pool size is None or explicitly set to 0 we assume the
             # user did not want a queue for this sqlite connection and
             # hook in the null pool.
             elif not pool_size:
                 from sqlalchemy.pool import NullPool
+
                 options['poolclass'] = NullPool
 
         engine = create_engine(sa_url, **options)
@@ -294,6 +313,7 @@ class DBManager(object):
             # 强制 SQLITE 支持支持外键
             # https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#foreign-key-support
             from sqlalchemy import event
+
             @event.listens_for(engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):
                 # print(f'ffff {dbapi_connection=} {connection_record=}')
@@ -326,10 +346,10 @@ class DBManager(object):
             return
         raise KeyError(f'bind_key {bind_key} is duplicated!')
 
-    def get_Model(self, bind_key: str=None):
+    def get_Model(self, bind_key: str = None):
         return self.__model_classes.get(bind_key or self.default_bind_key)
 
-    def set_Model(self, bind_key: str=None):
+    def set_Model(self, bind_key: str = None):
         """ 设置并保存一个 Model。
 
         :param bind_key: 详见 
@@ -342,8 +362,8 @@ class DBManager(object):
         Model.bind_key = bind_key
         self.__model_classes[bind_key] = Model
         return Model
-        
-    def get_engine(self, bind_key: str=None) -> Engine:
+
+    def get_engine(self, bind_key: str = None) -> Engine:
         """ 获取一个 Engine 对象。
 
         :param bind_key: 
@@ -355,7 +375,7 @@ class DBManager(object):
         """ 创建一个 Session 对象。 """
         return self.Session_Factory()
 
-    def create_scoped_session(self, in_flask: bool=False) -> scoped_session:
+    def create_scoped_session(self, in_flask: bool = False) -> scoped_session:
         """ 创建一个 scoped_session 代理。
 
         :param in_flask: 是否在 Flask 中使用。
@@ -368,10 +388,9 @@ class DBManager(object):
             # werkzeug/local.py:215: DeprecationWarning: '__ident_func__' is deprecated and will be removed in Werkzeug 2.1. It should not be used in Python 3.7+.
             # import flask
             # _get_ident = flask._app_ctx_stack.__ident_func__
-            return scoped_session(self.Session_Factory, 
-                scopefunc=_get_ident)
+            return scoped_session(self.Session_Factory, scopefunc=_get_ident)
         return scoped_session(self.Session_Factory)
-        
+
 
 class SQLAlchemy(object):
     """ 创建一个用 sqlalchemy 管理数据库的对象。
@@ -383,6 +402,7 @@ class SQLAlchemy(object):
     :param in_flask: 是否在 Flask 框架内部。若在 Flask 内部使用，
         创建 Session 实例的时候会使用 scoped_session。
     """
+
     dbm: DBManager = None
     is_scoped: bool = True
     in_flask: bool = True
@@ -390,13 +410,15 @@ class SQLAlchemy(object):
     Session: Union[sessionmaker, scoped_session] = None
     """ 根据 is_scoped 的值，保存 sessionmaker 或者 scoped_session 的结果对象。"""
 
-    def __init__(self,
-        dbm: DBManager=None,
-        URI: Union[dict, str]=None,
-        ENGINE_OPTIONS: dict=None,
-        is_scoped: bool=True,
-        in_flask: bool=False,
-        **kwargs: dict) -> None:
+    def __init__(
+        self,
+        dbm: DBManager = None,
+        URI: Union[dict, str] = None,
+        ENGINE_OPTIONS: dict = None,
+        is_scoped: bool = True,
+        in_flask: bool = False,
+        **kwargs: dict,
+    ) -> None:
 
         if dbm is None:
             dbm = DBManager(URI, ENGINE_OPTIONS, **kwargs)
@@ -409,7 +431,7 @@ class SQLAlchemy(object):
         else:
             self.Session = self.dbm.Session_Factory
 
-    def Model(self, bind_key: str=None):
+    def Model(self, bind_key: str = None):
         """ 获取对应的 Model Factory class。
 
         :param bind_key: 
@@ -417,7 +439,7 @@ class SQLAlchemy(object):
         """
         return self.dbm.get_Model(bind_key)
 
-    def isModel(self, instance, bind_key: str=None):
+    def isModel(self, instance, bind_key: str = None):
         """ 判断一个实例是否是 Model 的实例。
 
         :param bind_key: 
@@ -426,7 +448,7 @@ class SQLAlchemy(object):
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
-    def engine(self, bind_key: str=None) -> Engine:
+    def engine(self, bind_key: str = None) -> Engine:
         """ 从 DBManager 中获取对应的 engine 实例。
 
         :param bind_key: 
@@ -434,7 +456,7 @@ class SQLAlchemy(object):
         """
         return self.dbm.get_engine(bind_key)
 
-    def connection(self, bind_key: str=None) -> Connection:
+    def connection(self, bind_key: str = None) -> Connection:
         """ 调用 Engine 的 connect 放来了获取一个 connection 对象。"""
         return self.engine(bind_key).connect()
 
@@ -449,13 +471,15 @@ class SQLAlchemy(object):
         :param model_cls: 一个 Model对象。
         """
         return self.session().query(*entities)
-        
-    def metadata(self, bind_key: str=None) -> MetaData:
+
+    def metadata(self, bind_key: str = None) -> MetaData:
         """ 获取对应 Model 的 metadata 实例
         """
         return self.Model(bind_key).metadata
 
-    def create_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
+    def create_tables(
+        self, table_names: list[str] = None, bind_key: str = None
+    ) -> None:
         """ 创建 table。
 
         :param table_names: 提供 table 名称列表。
@@ -470,7 +494,7 @@ class SQLAlchemy(object):
         else:
             metadata.create_all(bind=engine, checkfirst=True)
 
-    def drop_tables(self, table_names: list[str]=None, bind_key: str=None) -> None:
+    def drop_tables(self, table_names: list[str] = None, bind_key: str = None) -> None:
         """ 移除 table。
 
         :param table_names: 提供 table 名称列表。
@@ -484,8 +508,8 @@ class SQLAlchemy(object):
             metadata.drop_all(bind=engine, tables=tables, checkfirst=True)
         else:
             metadata.drop_all(bind=engine, checkfirst=True)
-    
-    def recreate_table(self, *table_names: str, bind_key: str=None) -> None:
+
+    def recreate_table(self, *table_names: str, bind_key: str = None) -> None:
         """ 重建 table，支持单个或者多个名称。"""
         self.drop_tables(table_names=table_names, bind_key=bind_key)
         self.create_tables(table_names=table_names, bind_key=bind_key)
@@ -496,14 +520,14 @@ class SQLAlchemy(object):
         for bind_key in self.dbm.bind_keys:
             metadata = self.metadata(bind_key)
             metadata.create_all(bind=self.engine(bind_key), checkfirst=True)
-        
+
     def drop_all(self) -> None:
         """ 删除所有数据库中的所有表。"""
         for bind_key in self.dbm.bind_keys:
             metadata = self.metadata(bind_key)
             metadata.drop_all(bind=self.engine(bind_key), checkfirst=True)
 
-    def get_table(self, name: str, bind_key: str=None) -> Table:
+    def get_table(self, name: str, bind_key: str = None) -> Table:
         """ 获取一个 Table。
 
         :param name: Table 名称。
