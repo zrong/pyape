@@ -17,6 +17,14 @@ from pyape.config import merge_dict
 
 
 class ConfigWriter(object):
+    tpl_name: str
+    tpl_filename: str
+    dst_file: Path
+    replace_obj: dict
+    tpl_dir: Path
+    exists_before_write: bool = False
+    """ 在写入文件前，该文件是否存在。"""
+
     def __init__(self, tpl_name: str, dst_file: Path, replace_obj: dict, tpl_dir: Optional[Path]) -> None:
         """ 初始化
         :param tplname: 模版名称，不含扩展名
@@ -45,7 +53,8 @@ class ConfigWriter(object):
         """ 写入配置文件
         :param force: 若 force 为 False，则仅当文件不存在的时候才写入。
         """
-        if not force and self.dst_file.exists():
+        self.exists_before_write = self.dst_file.exists()
+        if not force and self.exists_before_write:
             return
         if self.tpl_name.endswith('.json'):
             self.dst_file.write_text(json.dumps(self.replace_obj, ensure_ascii=False, indent=4))

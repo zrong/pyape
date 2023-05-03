@@ -54,7 +54,7 @@ def write_config_file(
             env_name, pyape_conf, work_dir=work_dir, tpl_dir=tpl_dir
         )
         replacer.set_writer(tpl_name, force, target_postfix)
-        if not force and replacer.writer.dst_file.exists():
+        if not force and replacer.writer.exists_before_write:
             st = click.style(f'文件 {replacer.writer.dst_file.as_uri()} 已存在。可使用 --force 参数强制覆盖。', fg='red')
             click.echo(st)
     except Exception as e:

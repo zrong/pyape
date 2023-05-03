@@ -289,13 +289,13 @@ def from_month(month_text: str, last_month: int = None, use_year: bool=False) ->
 
 
 def month2date(month_text: str, last: bool = False) -> int:
-    """ 将一个 month_text 转换成一个日期
-    如果提供的年，则转换为当年的一个日期
-    如果提供的是月，则转换为当月的一个日期
-    若提供的是日期，则直接转换为整数
+    """ 将一个 month_text 转换成一个日期。
+    如果提供的年，则转换为当年的一个日期。
+    如果提供的是月，则转换为当月的一个日期。
+    若提供的是日期，则直接转换为整数。
 
-    :param month_text: 见 from_month
-    :param last: 若为 True 转换为最后日期，否则转换为首日
+    :param month_text: 见 from_month。
+    :param last: 若为 True 转换为最后日期，否则转换为首日。
     """
     if len(month_text) == 8:
         return int(month_text)
