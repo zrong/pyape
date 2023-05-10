@@ -322,9 +322,10 @@ def putconf(ctx, cwd, env, force):
 )
 @click.option('--env', '-E', required=True, help='输入支持的环境名称。')
 @click.option('--init', '-I', is_flag=True, help='是否初始化虚拟环境。')
+@click.option('--requirements', '-R', default='requirements.txt', show_default=True, help='指定 requirements.txt 的相对路径。')
 @click.argument('upgrade', nargs=-1)
 @click.pass_context
-def venv(ctx, cwd, env, init: bool, upgrade: tuple):
+def venv(ctx, cwd, env, init: bool, requirements: str, upgrade: tuple):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
@@ -332,7 +333,7 @@ def venv(ctx, cwd, env, init: bool, upgrade: tuple):
 
     d = Deploy(env, pyape_conf, conn, cwd)
     if init:
-        d.init_remote_venv()
+        d.init_remote_venv(req_path=requirements)
     if len(upgrade) > 0:
         d.pipupgrade(names=upgrade)
     else:

@@ -198,7 +198,7 @@ class Deploy(object):
             raise Exit('venv 还没有创建！请先执行 init_remote_venv')
         return 'source {}/bin/activate'.format(remote_venv_dir)
 
-    def init_remote_venv(self):
+    def init_remote_venv(self, req_path: str='requirements.txt'):
         """ 创建虚拟环境
         """
         remote_venv_dir = self.get_remote_path('venv')
@@ -206,7 +206,7 @@ class Deploy(object):
             self.conn.run('{} -m venv {}'.format(self.pye, remote_venv_dir))
         with self.conn.prefix('source {}/bin/activate'.format(remote_venv_dir)):
             self.conn.run('pip install -U pip')
-            self.conn.run('pip install -r {}'.format(self.get_remote_path('requirements.txt')))
+            self.conn.run('pip install -r {}'.format(self.get_remote_path(req_path)))
 
     def piplist(self, format='columns'):
         """ 获取虚拟环境中的所有安装的 python 模块
