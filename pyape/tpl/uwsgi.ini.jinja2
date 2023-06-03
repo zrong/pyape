@@ -79,6 +79,11 @@ master-fifo = %d%n.fifo
 # 如果使用了 logger 配置，那么配置了地址也不会输出
 daemonize = {{daemonize}}
 {%- endif %}
+{%- if lazy_apps %}
+# 可解决 pymysql 的线程问题
+# (pymysql.err.InternalError) Packet sequence number wrong - got 0 expected 1
+lazy-apps = true
+{%- endif %}
 {%- if logto %}
 logto = {{logto}}
 {%- endif %}

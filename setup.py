@@ -27,7 +27,7 @@ def find_requires(*file_paths):
 
 
 classifiers = [
-    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.11',
     'Development Status :: 4 - Beta',
     'Environment :: Console',
     'Environment :: Web Environment',
@@ -60,7 +60,7 @@ setup(
     url = "https://github.com/zrong/pyape",
     license = "BSD 3",
     keywords = "development zrong flask wechat",
-    python_requires='>=3.9, <4',
+    python_requires='>=3.11, <4',
     packages = find_packages(exclude=['test*', 'doc*', 'fabric']),
     install_requires=find_requires('requirements', 'dev.txt'),
     entry_points=entry_points,

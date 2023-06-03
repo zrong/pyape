@@ -5,8 +5,9 @@ pyape.cache
 """
 import warnings
 import pickle
+from typing import Any
+from redis.client import Redis
 from pyape import uwsgiproxy
-from pyape.flask_redis import FlaskRedis
 
 
 class Cache(object):
@@ -68,17 +69,21 @@ class DictCache(Cache):
 
 
 class RedisCache(Cache):
-    def __init__(self, flask_redis_client):
+    def __init__(self, redis_client):
         super().__init__('redis')
-        self.__client = flask_redis_client
-        if isinstance(self.__client, FlaskRedis):
-            raise ValueError(FlaskRedis)
+        self.__client = redis_client
+        if not isinstance(self.__client, Redis):
+            raise ValueError('The redis_client must be a Redis instance!')
 
-    def __getitem__(self, name):
-        return self.__client.get(name)
+    def __getitem__(self, name: str):
+        raw_value = self.__client.get(name)
+        if raw_value is None:
+            return None
+        return pickle.loads(raw_value, encoding='utf8')
 
-    def __setitem__(self, name, value):
-        self.__client.set(name, value)
+    def __setitem__(self, name: str, value: Any):
+        raw_value = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        self.__client.set(name, raw_value)
 
     def mset(self, nvs):
         """ 批量设置
@@ -97,11 +102,11 @@ class GlobalCache(object):
     def from_config(cls, ctype, **kwargs):
         """ 获取一个 Cache 实例
         """
-        warnings.warn('USE CACHE {}'.format(ctype))
+        warnings.warn(f'GlobalCache USE CACHE {ctype}')
         if ctype == 'uwsgi':
             return cls(UwsgiCache())
         elif ctype == 'redis':
-            return cls(RedisCache(kwargs.get('flask_redis_client')))
+            return cls(RedisCache(kwargs.get('redis_client')))
         return cls(DictCache())
 
     @property
@@ -109,7 +114,7 @@ class GlobalCache(object):
         return self.cache.ctype
 
     def keyname(self, r, name):
-        return str(r) + '_' + str(name)
+        return f'{r}_{name}'
 
     def getg(self, name, r=0):
         """ 默认使用 0 这个r值，代表不区分 r
