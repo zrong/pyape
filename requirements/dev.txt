@@ -8,7 +8,6 @@ python-dotenv
 cryptography
 redis
 tomli-w
-patchwork
 python-json-logger
 pyzmq
 httpx

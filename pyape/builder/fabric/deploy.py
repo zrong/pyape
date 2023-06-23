@@ -1,13 +1,15 @@
+"""
+pyape.builder.fabric.deploy
+~~~~~~~~~~~~~~~~~~~
+
+同步 fabric 进行远程部署。
+"""
+
 import re
-import logging
-import sys
-import os
 import json
-from typing import Optional, final
 from datetime import datetime
 
 from pathlib import Path
-from patchwork import files, transfers
 from invoke import runners
 from invoke.exceptions import Exit
 from fabric import Connection
@@ -15,83 +17,7 @@ from fabric import Connection
 from pyape.builder import MAIN_CONFIG_FILES
 from pyape.builder.conf import  ConfigReplacer
 
-
-logger = logging.Logger('fabric', level=logging.DEBUG)
-logger.addHandler(logging.StreamHandler(sys.stdout))
-
-
-class Tmux(object):
-    """Tmux helper for fabric 2"""
-    def __init__(self, runner, session_name='default'):
-        self.session_name = session_name
-        self.run_cmd = runner.run
-
-        self.create_session()
-
-    def create_session(self):
-        test = self.run_cmd('tmux has-session -t %s' % self.session_name, warn=True)
-
-        if test.failed:
-            self.run_cmd('tmux new-session -d -s %s' % self.session_name)
-
-        self.run_cmd(
-            'tmux set-option -t %s -g allow-rename off' % self.session_name)
-
-    def recreate(self):
-        self.kill_session()
-        self.create_session()
-
-    def kill_session(self):
-        self.run_cmd('tmux kill-session -t %s' % self.session_name)
-
-    def command(self, command, pane=0):
-        self.run_cmd('tmux send-keys -t %s:%s "%s" ENTER' % (
-            self.session_name, pane, command))
-
-    def new_window(self, name):
-        self.run_cmd('tmux new-window -t %s -n %s' % (self.session_name, name))
-
-    def find_window(self, name):
-        test = self.run_cmd('tmux list-windows -t %s | grep \'%s\'' % (self.session_name, name), warn=True)
-
-        return test.ok
-
-    def rename_window(self, new_name, old_name=None):
-        if old_name is None:
-            self.run_cmd('tmux rename-window %s' % new_name)
-        else:
-            self.run_cmd('tmux rename-window -t %s %s' % (old_name, new_name))
-
-    def wait_for(self, signal_name):
-        self.run_cmd('tmux wait-for %s' % signal_name)
-
-    def run_singleton(self, command, orig_name, wait=True):
-        run_name = "run/%s" % orig_name
-        done_name = "done/%s" % orig_name
-
-        # If the program is running we wait to be finished.
-        if self.find_window(run_name):
-            self.wait_for(run_name)
-
-        # If the program is not running we create a window with done_name
-        if not self.find_window(done_name):
-            self.new_window(done_name)
-
-        self.rename_window(run_name, done_name)
-
-        # Check that we can execute the commands in the correct window
-        assert self.find_window(run_name)
-
-        rename_window_cmd = 'tmux rename-window -t %s %s' % (
-            run_name, done_name)
-        signal_cmd = 'tmux wait-for -S %s' % run_name
-
-        expanded_command = '%s ; %s ; %s' % (
-            command, rename_window_cmd, signal_cmd)
-        self.command(expanded_command, run_name)
-
-        if wait:
-            self.wait_for(run_name)
+from . import logger, rsync
 
 
 class Deploy(object):
@@ -135,7 +61,8 @@ class Deploy(object):
         # files.exists 仅接受字符串
         if isinstance(file, Path):
             file = file.resolve().as_posix()
-        return files.exists(self.conn, file)
+            command = f'test -e "$(echo {file})"'
+            return self.conn.run(command, hide=True, warn=True).ok
 
     def make_remote_dir(self, *args):
         """ 创建部署文件夹
@@ -281,7 +208,7 @@ class Deploy(object):
             pdir += '/'
         deploy_dir = self.get_remote_path()
         self.init_remote_dir(deploy_dir)
-        transfers.rsync(self.conn, pdir, deploy_dir, exclude=exclude)
+        rsync(self.conn, pdir, deploy_dir, exclude=exclude)
         logger.warn('RSYNC [%s] to [%s]', pdir, deploy_dir)
 
     def get_logs(self, extras=[]):

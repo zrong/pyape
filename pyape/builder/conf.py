@@ -10,7 +10,7 @@ import jinja2
 from pathlib import Path
 from typing import Any, Optional
 
-import tomli as tomllib
+import tomllib
 import tomli_w
 from pyape.tpl import base_dir as pyape_tpl_dir
 from pyape.config import merge_dict
@@ -97,6 +97,12 @@ class ConfigReplacer(object):
         keys = self.envs.keys()
         if not self.env_name in self.envs: 
             raise ValueError('env must be in follow values: \n\n{}'.format('\n'.join(keys)))
+
+    def get_env_value(self, key=None, default_value=None):
+        value = self.envs.get(self.env_name)
+        if value and key is not None:
+            return value.get(key, default_value)
+        return value
         
     def _set_replace_keys(self):
         """ name 和 deploy_dir 的值允许作为替换值使用，但这两个值中也可能包含替换值，因此需要先固化下来"""
@@ -167,20 +173,18 @@ class ConfigReplacer(object):
 environ_keys: {environ_keys}
 replace_obj: {replace_obj}.''')
 
-    def get_env_value(self, key=None, default_value=None):
-        value = self.envs.get(self.env_name)
-        if value and key is not None:
-            return value.get(key, default_value)
-        return value
-    
-    def set_writer(self, tpl_name: str, force=True, target_postfix: str='', immediately: bool=True) -> tuple[Path, Path]:
-        """ 写入配置文件"""
+    def get_replace_obj(self, tpl_name: str) -> dict:
+        """ 获取已经替换过所有值的对象。"""
         replace_obj = self.get_tpl_value(tpl_name)
-        # print(f'write_config_file {tpl_name} {replace_obj}')
         replace_str = tomli_w.dumps(replace_obj)
         # 将 obj 转换成 toml 字符串，进行一次替换，然后再转换回 obj
         # 采用这样的方法可以不必处理复杂的层级关系
         replace_obj = tomllib.loads(self.replace(replace_str))
+        return replace_obj
+
+    def set_writer(self, tpl_name: str, force=True, target_postfix: str='', immediately: bool=True) -> tuple[Path, Path]:
+        """ 写入配置文件"""
+        replace_obj = self.get_replace_obj(tpl_name)
         # 不加后缀的文件路径
         target = self.work_dir.joinpath(tpl_name)
         # 加入后缀的文件路径，大部分情况下雨 target 相同

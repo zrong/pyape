@@ -306,7 +306,7 @@ def putconf(ctx, cwd, env, force):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
+    from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
     d = Deploy(env, pyape_conf, conn, cwd)
     d.put_config(force=force)
@@ -329,7 +329,7 @@ def venv(ctx, cwd, env, init: bool, requirements: str, upgrade: tuple):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
+    from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
     d = Deploy(env, pyape_conf, conn, cwd)
     if init:
@@ -354,7 +354,7 @@ def deploy(ctx, cwd, env):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
+    from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
     d = Deploy(env, pyape_conf, conn, cwd)
     d.rsync(exclude=pyape_conf['RSYNC_EXCLUDE'])
@@ -376,7 +376,7 @@ def start(ctx, cwd, env):
     conn = _build_conn(env, pyape_conf, cwd)
 
     try:
-        from pyape.builder.fabric import GunicornDeploy as Deploy
+        from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
         d = Deploy(env, pyape_conf, conn, cwd)
         d.start()
@@ -398,7 +398,7 @@ def stop(ctx, cwd, env):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
+    from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
     d = Deploy(env, pyape_conf, conn, cwd)
     d.stop()
@@ -418,7 +418,7 @@ def reload(ctx, cwd, env):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
+    from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
     d = Deploy(env, pyape_conf, conn, cwd)
     d.reload()
@@ -456,7 +456,7 @@ def pipoutdated(ctx, cwd, env):
     cwd, pyape_conf = check_pyape_toml(cwd, ctx)
     conn = _build_conn(env, pyape_conf, cwd)
 
-    from pyape.builder.fabric import GunicornDeploy as Deploy
+    from pyape.builder.fabric.deploy import GunicornDeploy as Deploy
 
     d = Deploy(env, pyape_conf, conn, cwd)
     d.pipoutdated()
