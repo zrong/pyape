@@ -173,7 +173,13 @@ class RequestValue:
     """ 代表这次使用 json 请求。"""
 
     check_response: Callable[[httpx.Response], ResponseValue] = None
-    """ check_response 接收一个 Response 参数，返回确定的任意值，用于下一步处理。"""
+    """ check_response 接收一个 httpx.Response 参数，返回 ResponseValue，用于下一步处理。"""
+
+    after_response: Callable = None
+    """ after_response 保存期待在获得 ResponseValue 之后再调用的方法。
+    check_response 可以修改原始的 httpx.Respone，
+    而 after_response 更加灵活，对参数和返回值都不做限制。
+    """
 
     kwargs: dict = None
 
@@ -187,6 +193,7 @@ class RequestValue:
                  is_json: bool = False,
                  check_response: Callable[[httpx.Response],
                                           ResponseValue] = None,
+                 after_response: Callable = None,
                  **kwargs) -> None:
         self.url = url
         self.url_map = url_map
@@ -195,6 +202,7 @@ class RequestValue:
         self.headers = headers
         self.is_json = is_json
         self.check_response = check_response
+        self.after_response = after_response
 
         # 支持更多数据
         self.kwargs = kwargs
@@ -258,7 +266,7 @@ class HTTPxMixIn:
     """ 需要 http 请求功能的类，可以混合这个类，以提供自己的 http 请求功能。
     当然也可以使用继承或者组合的方式使用。支持异步和同步调用。
 
-    比较两种回调的区别：
+    比较几种回调的区别：
 
     - RequestValue.check_response(httpx.Response)
         在 **每次** HTTP 请求成功之后调用。传递的参数是 httpx.Response 对象。
@@ -269,7 +277,7 @@ class HTTPxMixIn:
         在同步调用时，HTTPxMixIn.get 和 HTTPxMixIn.post 只有一次请求，
         可以通过对同步方法返回的 ResponseValue.httpx_response 对象进行处理代替对 httpx.Response 的处理。
         因此在 HTTPxMixIn.get 和 HTTPxMixIn.post 中没有包含 check_response 参数传递。
-    
+
     - HTTPxMixIn *_async(callback) 中的 callback
         在 **每组** 异步 HTTP 请求成功之后调用。传递的参数是 ResponseValue 或者 list[ResponseValue]。
         同步 HTTP 方法不支持 callback，因为直接使用 return 更高效（request_once_sync/request_sync就是这么做的） 。
@@ -277,13 +285,26 @@ class HTTPxMixIn:
         传递给 callback 的参数是 ResponseValue，因为即使是异步，也只有一次 http 调用。
         使用 request_async_wait_run 进行调用的时候，传递的参数是 list[ResponseValue]。
 
-    如何选择两种回调：
+    - RequestValue.after_response(ResponseValue)
+        一般在 HTTPxMixIn *_async(callback) 的 callback 中调用。
+        亦可在获得 Respone 之后的任何时刻调用，这取决于使用场景。
+
+        下面是一个场景：
+
+        在 **一组** 异步调用完成之后，可能需要一些对于请求的清理工作。
+        check_response 并不适合做这个清理工作，因为它的参数是 httpx.Respone，此时还没有对 http 返回的值做分析。
+        after_response 可以在分析完毕之后再处理，它更加灵活，对参数和返回值都不做限制。
+        在一组异步请求之后，如果需要分析这一组返回的信息，并于其他信息进行比较，用 after_response 更合适。
+    
+
+    如何选择回调方式：
 
         check_response 是在 **一次 http 请求** 完成后回调，而 callback 是在 **一组 http 请求** 完成之后回调。
         可以根据回调执行的及时性来决定使用哪一种。
 
         check_response 是在异步线程中执行的。在这里处理，无法与其它处理结果进行比较。
         callback 则返回到主线程执行。因为已经获取了所有的返回，方便整体处理。
+        此时在 callback 中调用 after_response 就是一个合理的选择。
     """
     _client_sync: httpx.Client = None
     """ 同步版本的 client。"""
@@ -335,6 +356,7 @@ class HTTPxMixIn:
                             is_json: bool = False,
                             check_response: Callable[[httpx.Response],
                                                      ResponseValue] = None,
+                            after_response: Callable = None,
                             insert_to_list: bool = False,
                             **kwargs):
         """ 返回一个 RequestValue 对象。
@@ -355,6 +377,7 @@ class HTTPxMixIn:
                               url_map=url_map,
                               is_json=is_json,
                               check_response=check_response,
+                              after_response=after_response,
                               **kwargs)
         if insert_to_list:
             self._request_values.append(rv)
@@ -481,7 +504,7 @@ class HTTPxMixIn:
                                           rv: RequestValue,
                                           callback: Callable[[ResponseValue],
                                                              None] = None):
-        """ 异步请求一次，使用 callback 来处理这次的响应。"""
+        """ 异步请求一次，使用 callback 来处理这一次 http 响应。"""
         async with httpx.AsyncClient() as client:
             response_value = self.request_once_async(client, rv)
             if callback:

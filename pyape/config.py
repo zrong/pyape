@@ -8,14 +8,16 @@ pyape.config
 提供配置文件相关的读取和写入方法
 """
 
+import re
 from pathlib import Path
 import json
 import time
 from typing import Any, Union
-import tomli as tomllib
+import tomllib
 import tomli_w
 
 from pyape.util.encrypt import Encrypt
+from pyape.util.func import parse_int
 
 
 # 根据平台中的配置字符串，确定属于哪个平台
@@ -283,6 +285,43 @@ class GlobalConfig(object):
                 self.setcfg(*args[1:], value=value, data=cur_data)
             else:
                 data[arg0] = value
+
+    def getdburi(self, *, r: int = None, bind_key: str = None):
+        """ 获取配置文件中保存的数据库配置。
+        提供解析数据库路径的功能，方便直接使用 pymysql 的方法调用数据库。
+        """
+        dbbinds = self.getcfg('FLASK', 'SQLALCHEMY_BINDS')
+        dburi = self.getcfg('FLASK', 'SQLALCHEMY_DATABASE_URI')
+        uri = None
+        if r is not None:
+            r, regional = self.regional.check_regional(r)
+            if regional and regional.get('bind_key_db') and dbbinds:
+                uri = dbbinds.get(regional.get('bind_key_db'))
+        elif bind_key is not None:
+            if dbbinds:
+                uri = dbbinds.get(bind_key)
+        elif bind_key is None:
+            uri = dburi
+        if uri is None:
+            return None
+        dbre = re.compile(
+            r'.*//(?P<user>[\w_]+):(?P<password>\w+)@(?P<host>[\w\.]+):(?P<port>\d+)/(?P<database>[\w_]+)$'
+        )
+        m = dbre.match(uri)
+        if m is None:
+            raise ValueError(f'[{uri}] is not valid!')
+        port = parse_int(m.group('port'))
+        if port is None:
+            raise ValueError(
+                f'[{uri}] is not valid: port should be of type int!')
+        return {
+            'uri': uri,
+            'host': m.group('host'),
+            'port': port,
+            'user': m.group('user'),
+            'password': m.group('password'),
+            'database': m.group('database'),
+        }
 
     def encode_token(self, expire: int=86400, ts: int=None, **values: dict) -> str:
         """ 使用 Fernet 算法加密一组值为 token 用于鉴权。

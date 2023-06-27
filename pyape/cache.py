@@ -69,7 +69,7 @@ class DictCache(Cache):
 
 
 class RedisCache(Cache):
-    def __init__(self, redis_client):
+    def __init__(self, redis_client: Redis):
         super().__init__('redis')
         self.__client = redis_client
         if not isinstance(self.__client, Redis):
@@ -106,7 +106,22 @@ class GlobalCache(object):
         if ctype == 'uwsgi':
             return cls(UwsgiCache())
         elif ctype == 'redis':
-            return cls(RedisCache(kwargs.get('redis_client')))
+            # 优先确认 redis_client 参数
+            redis_client = kwargs.get('redis_client')
+            if redis_client is None:
+                # 将 grc 参数作为 PyapeRedis 实例对待
+                grc = kwargs.get('grc')
+                if grc and getattr(grc, 'get_client', None):
+                    # 获取名称为 cache 的 redis 定义，作为 cache 的源。
+                    redis_client = grc.get_client(bind_key='cache')
+                    if redis_client is None:
+                        # 如果没有指定 cache 对应的 redis 服务器配置名称，
+                        # 就使用默认的 REDIS_URI 配置的源作为 cache 的源。
+                        redis_client = grc.get_client()
+            # redis 模式下，redis_client 必须存在
+            if redis_client is None:
+                raise ValueError('redis_client must be existence!')
+            return cls(RedisCache(redis_client))
         return cls(DictCache())
 
     @property

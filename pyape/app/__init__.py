@@ -102,7 +102,6 @@ def init_cache(pyape_app: PyapeFlask, create_args: dict=None):
     if gcache is not None:
         raise ValueError('global cache 不能重复定义！')
     ctype = None
-    redis_client = None
     if grc is None:
         if uwsgiproxy.in_uwsgi:
             ctype = 'uwsgi'
@@ -110,12 +109,7 @@ def init_cache(pyape_app: PyapeFlask, create_args: dict=None):
             ctype = 'dict'
     else:
         ctype = 'redis'
-        # 获取名称为 cache 的 redis 定义，作为 cache 的源。
-        redis_client = grc.get_client(bind_key='cache')
-        if redis_client is None:
-            # 如果没有配置 cache，则使用默认的 REDIS_URI 配置的源作为 cache 的源。
-            redis_client = grc.get_client()
-    gcache = GlobalCache.from_config(ctype, redis_client=redis_client)
+    gcache = GlobalCache.from_config(ctype, grc=grc)
 
 
 def register_blueprint(pyape_app, rest_package, rest_package_names) -> None:
