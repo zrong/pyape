@@ -245,12 +245,13 @@ class RequestValue:
         if self.method == 'GET':
             p['params'] = self.value
         elif self.is_json:
-            p['content'] = json.dumps(self.value, ensure_ascii=False)
             headers = {'Content-Type': 'application/json'}
             if self.headers:
                 self.headers.update(headers)
             else:
                 self.headers = headers
+            p['content'] = json.dumps(self.value, ensure_ascii=False)
+            p['headers'] = self.headers
         else:
             p['data'] = self.value
         if self.kwargs:

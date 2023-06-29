@@ -11,17 +11,18 @@ from pyape import uwsgiproxy
 
 
 class Cache(object):
-    """ 处理缓存
-    在 UWSGI 中运行的时候，使用 UWSGI 的缓存机制，实现进程间共享
-    否则，在内存中保存缓存
+    """ 处理缓存。
     """
-    def __init__(self, ctype):
+    ctype: str = None
+    """ 保存缓存的类型，目前支持三种缓存： uwsgi/dict/redis。"""
+    def __init__(self, ctype: str):
         self.ctype = ctype
 
 
 class UwsgiCache(Cache):
     def __init__(self):
         super().__init__('uwsgi')
+        warnings.warn(f'GlobalCache USE {self!s}')
 
     def __getitem__(self, name):
         """
@@ -52,6 +53,9 @@ class UwsgiCache(Cache):
         else:
             uwsgiproxy.cache_set(name, raw_value)
 
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__}'
+
 
 class DictCache(Cache):
     """ 使用一个 Python Dict 保存缓存
@@ -60,6 +64,7 @@ class DictCache(Cache):
     def __init__(self):
         super().__init__('dict')
         self.__g = {}
+        warnings.warn(f'GlobalCache USE {self!s}')
 
     def __getitem__(self, name):
         return self.__g.get(name)
@@ -67,13 +72,20 @@ class DictCache(Cache):
     def __setitem__(self, name, value):
         self.__g[name] = value
 
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__} {id(self.__g)}'
+
 
 class RedisCache(Cache):
-    def __init__(self, redis_client: Redis):
+    redis_uri: str = None
+
+    def __init__(self, redis_client: Redis, redis_uri: str=None):
         super().__init__('redis')
+        self.redis_uri = redis_uri
         self.__client = redis_client
         if not isinstance(self.__client, Redis):
             raise ValueError('The redis_client must be a Redis instance!')
+        warnings.warn(f'GlobalCache USE {self!s}')
 
     def __getitem__(self, name: str):
         raw_value = self.__client.get(name)
@@ -90,6 +102,9 @@ class RedisCache(Cache):
         """
         self.__client.mset(nvs)
 
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__} {self.redis_uri}'
+
 
 class GlobalCache(object):
     """ 创建一个唯一的全局 Cache 方便使用
@@ -102,26 +117,24 @@ class GlobalCache(object):
     def from_config(cls, ctype, **kwargs):
         """ 获取一个 Cache 实例
         """
-        warnings.warn(f'GlobalCache USE CACHE {ctype}')
         if ctype == 'uwsgi':
             return cls(UwsgiCache())
         elif ctype == 'redis':
             # 优先确认 redis_client 参数
             redis_client = kwargs.get('redis_client')
+            redis_uri = kwargs.get('redis_uri')
             if redis_client is None:
                 # 将 grc 参数作为 PyapeRedis 实例对待
                 grc = kwargs.get('grc')
                 if grc and getattr(grc, 'get_client', None):
                     # 获取名称为 cache 的 redis 定义，作为 cache 的源。
-                    redis_client = grc.get_client(bind_key='cache')
-                    if redis_client is None:
-                        # 如果没有指定 cache 对应的 redis 服务器配置名称，
-                        # 就使用默认的 REDIS_URI 配置的源作为 cache 的源。
-                        redis_client = grc.get_client()
+                    bind_key = 'cache'
+                    redis_client = grc.get_client(bind_key, miss_default=True)
+                    redis_uri = grc.get_uri(bind_key, miss_default=True)
             # redis 模式下，redis_client 必须存在
             if redis_client is None:
                 raise ValueError('redis_client must be existence!')
-            return cls(RedisCache(redis_client))
+            return cls(RedisCache(redis_client, redis_uri))
         return cls(DictCache())
 
     @property

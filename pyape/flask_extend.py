@@ -351,8 +351,24 @@ class PyapeDB(SQLAlchemy):
 
 
 class PyapeRedis:
-    _redis_client = None
-    _redis_binds: dict = None
+    """ 基于 flask-redis 修改
+    增加 根据 Regional 获取 redis client 的封装
+    https://github.com/underyx/flask-redis
+    """
+    _gconf: GlobalConfig = None
+    _rconf: RegionalConfig = None
+
+    _client: Redis = None
+    """ 保存对应 REDIS_URI 的 redis client 对象。"""
+
+    _client_binds: dict = None
+    """ 保存对应 REDIS_BINDS 的 redis client 对象。"""
+
+    _uri: str = None
+    """ 配置文件中的 REDIS_URI 的值。"""
+
+    _uri_binds: dict = None
+    """ 配置文件中的 REDIS_BINDS 的值。"""
 
     def __init__(
         self,
@@ -370,9 +386,9 @@ class PyapeRedis:
         self.config_binds = f'{config_prefix}_BINDS'
 
         # 保存 REDIS_URI 中设定的那个连接
-        self._redis_client: Redis = None
+        self._client: Redis = None
         # 以 bind_key 保存 Client，其中 self._redis_client 将 None 作为 bind_key 保存
-        self._redis_binds = None
+        self._client_binds = None
 
         if app is not None:
             self._gconf = app._gconf
@@ -394,27 +410,40 @@ class PyapeRedis:
     def init_redis(self, **kwargs):
         """ 仅初始化 redis 连接。"""
         self.provider_kwargs.update(kwargs)
-        redis_url = self._gconf.getcfg(
+        self._uri = self._gconf.getcfg(
             self.config_uri, default_value='redis://localhost:6379/0')
-        self._redis_client = Redis.from_url(
-            redis_url, **self.provider_kwargs)
+        self._client = Redis.from_url(
+            self._uri, **self.provider_kwargs)
         self._update_binds()
 
     def _update_binds(self):
-        redis_binds = self._gconf.getcfg(self.config_binds)
-        self._redis_binds = {None: self._redis_client}
-        if isinstance(redis_binds, dict):
-            for bind_key, bind_uri in redis_binds.items():
-                self._redis_binds[bind_key] = Redis.from_url(
+        self._uri_binds = self._gconf.getcfg(self.config_binds)
+        self._client_binds = {None: self._client}
+        if isinstance(self._uri_binds, dict):
+            for bind_key, bind_uri in self._uri_binds.items():
+                self._client_binds[bind_key] = Redis.from_url(
                     bind_uri, **self.provider_kwargs)
 
-    def get_client(self, bind_key: str=None):
-        return self._redis_binds.get(bind_key)
+    def get_uri(self, bind_key: str=None, miss_default: bool=False) -> str:
+        """ 获取一个 redis uri 地址。
 
-    def get_clients(self):
-        return self._redis_binds
+        :param bind_key: 绑定的值，可以为 None
+        :param miss_default: 若找不到 bind_key 中的对应 uri，就使用默认的 self._uri。
+        """
+        return self._uri_binds.get(bind_key, self._uri if miss_default else None)
 
-    def get_regional_client(self, r: int, force: bool=True):
+    def get_client(self, bind_key: str=None, miss_default: bool=False) -> Redis:
+        """ 获取一个 redis client。
+
+        :param bind_key: 绑定的值，可以为 None
+        :param miss_default: 若找不到 bind_key 中的对应 client，就使用默认的 self._client。
+        """
+        return self._client_binds.get(bind_key, self._client if miss_default else None)
+
+    def get_clients(self) -> dict[str, Redis]:
+        return self._client_binds
+
+    def get_regional_client(self, r: int, force: bool=True) -> Redis:
         """ 根据 r 获取到一个 py_redis_client
 
         :param r: regional
