@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 import json
 import time
-from typing import Any, Union
+from typing import Any
 import tomllib
 import tomli_w
 
@@ -29,12 +29,12 @@ PlATFORMS = {
 }
 
 
-def merge_dict(x: dict, y: dict, z: dict=None) -> dict:
-    """ 合并 x 和 y 两个 dict。
+def merge_dict(x: dict, y: dict, z: dict = None) -> dict:
+    """合并 x 和 y 两个 dict。
 
     1. 用 y 的同 key 值覆盖 x 的值。
     2. y 中的新键名（x 中同级不存在）增加到 x 中。
-    
+
     返回一个新的 dict，不修改 x 和 y。
 
     :param x: x 被 y 覆盖。
@@ -66,7 +66,7 @@ def merge_dict(x: dict, y: dict, z: dict=None) -> dict:
             elif yv is not None:
                 newv = yv
         z[xk] = newv
-    
+
     # 将 y 中有但 x 中没有的键加入 z
     for yk, yv in y.items():
         if x.get(yk, None) is None:
@@ -107,7 +107,7 @@ class Dicto(dict):
         """
         if not parent:
             parent = self
-        for k,v in adict.items():
+        for k, v in adict.items():
             if isinstance(v, dict):
                 vconf = Dicto(v)
                 self.copy_from_dict(v, vconf)
@@ -117,13 +117,13 @@ class Dicto(dict):
 
 
 class RegionalConfig(object):
-    """ 为 Regional 机制提供的配置文件，用于解析 Regional 配置。
-    """
-    rlist = None
-    rdict = None
-    rids = None
+    """为 Regional 机制提供的配置文件，用于解析 Regional 配置。"""
 
-    def __init__(self, rlist):
+    rlist: list = None
+    rdict: dict = None
+    rids: list = None
+
+    def __init__(self, rlist: list):
         self.rlist = rlist
         self.rdict = {}
         self.rids = []
@@ -136,15 +136,15 @@ class RegionalConfig(object):
             self.rids.append(r)
             self.rdict[r] = regional
 
-    def get_regional(self, r):
-        """ 获取一个 regional 配置
+    def get_regional(self, r: int):
+        """获取一个 regional 配置
         :param int r: r 值
         :rtype: dict
         """
         return self.rdict.get(r)
 
-    def check_regional(self, r, ignore_zero=False):
-        """ 检查 regional 是否有效
+    def check_regional(self, r: int, ignore_zero: bool = False):
+        """检查 regional 是否有效
         :param ignore_zero: 值为真，则允许 r 值为 0。0 是一个特殊的 r 值，代表全局 r
         :return: 已经转换成整数的 regional 值
         """
@@ -162,8 +162,19 @@ class RegionalConfig(object):
             return None, None
         return r, regional
 
-    def get_platform_conf(self, r):
-        """ 根据 regional 中的配置，获取平台的类型和配置
+    def get_value(self, r: int, *, key: str, ignore_zero: bool = False):
+        """获取 regional[key] 的值。
+        :param r:
+        :param key: regional 的键名。
+        :param ignore_zero: 同 check_regional。
+        """
+        r, regional = self.check_regional(r, ignore_zero=ignore_zero)
+        if isinstance(regional, dict):
+            return regional.get(key)
+        return regional
+
+    def get_platform_conf(self, r: int):
+        """根据 regional 中的配置，获取平台的类型和配置
         在返回的数据中包含 pfvalue/pfkey
         若获取不到则返回 None
         """
@@ -180,7 +191,7 @@ class RegionalConfig(object):
 
 
 class GlobalConfig(object):
-    """ 全局配置文件，对应 config.toml """
+    """全局配置文件，对应 config.toml"""
 
     cfg_data: dict = None
     """ 全局变量，用于保存 config.toml/config.json 中载入的配置。"""
@@ -191,8 +202,8 @@ class GlobalConfig(object):
     encrypter: Encrypt = None
     """ 用于 Fernet 加解密对象。"""
 
-    def __init__(self, work_dir: Path=None, cfg: Union[dict, str]='config.toml'):
-        """ 初始化全局文件
+    def __init__(self, work_dir: Path = None, cfg: dict | str = 'config.toml'):
+        """初始化全局文件
         :param Path work_dir: 工作文件夹
         :param str|dict cfg: 相对于工作文件夹的配置文件地址，或者配置内容本身
         """
@@ -204,8 +215,10 @@ class GlobalConfig(object):
         if self.cfg_data:
             self.init_regionals(data=self.cfg_data)
 
-    def read(self, filename: str, work_dir: Path=None, throw_error: bool=False) -> Union[list, dict]:
-        """ 读取一个配置文件，支持 .json 和 .toml 扩展名。
+    def read(
+        self, filename: str, work_dir: Path = None, throw_error: bool = False
+    ) -> list | dict:
+        """读取一个配置文件，支持 .json 和 .toml 扩展名。
 
         :param filename: 文件名
         :param work_dir: str
@@ -226,8 +239,10 @@ class GlobalConfig(object):
             raise FileNotFoundError(f'{conf_file.as_posix()} is not found!')
         return {}
 
-    def write(self, filename: str, data_dict: Union[list, dict], work_dir: Path=None) -> None:
-        """ 将一个 dict 写入成为配置文件，支持 .toml 和 .json 后缀。
+    def write(
+        self, filename: str, data_dict: list | dict, work_dir: Path = None
+    ) -> None:
+        """将一个 dict 写入成为配置文件，支持 .toml 和 .json 后缀。
 
         :param data_dict: 要写入的配置信息
         """
@@ -236,12 +251,12 @@ class GlobalConfig(object):
             with conf_file.open(mode='wb') as f:
                 tomli_w.dump(data_dict, f)
         elif filename.endswith('.json'):
-            json.dump(data_dict, conf_file,  ensure_ascii=False, indent=2)
-            
-    def getdir(self, *args, work_dir: Path=None) -> Path:
-        """ 基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
+            json.dump(data_dict, conf_file, ensure_ascii=False, indent=2)
+
+    def getdir(self, *args, work_dir: Path = None) -> Path:
+        """基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
         如果传递 basedir，就基于这个 basedir 创建路径
-        
+
         :param args: 传递路径
         :param Path work_dir: 工作文件夹
         """
@@ -251,8 +266,10 @@ class GlobalConfig(object):
             raise ValueError('Please set work_dir first!')
         return Path(self.__work_dir, *args)
 
-    def getcfg(self, *args, default_value: Any=None, data: Union[str, dict]='cfg_file') -> Any:
-        """ 递归获取 conf 中的值。getcfg 不仅可用于读取 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+    def getcfg(
+        self, *args, default_value: Any = None, data: str | dict = 'cfg_file'
+    ) -> Any:
+        """递归获取 conf 中的值。getcfg 不仅可用于读取 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
 
         :param args: 需要读取的参数，支持多级调用，若级不存在，不会报错。
         :param default_value: 找不到这个键就提供一个默认值。
@@ -265,9 +282,9 @@ class GlobalConfig(object):
             cur_data = data.get(args[0], default_value)
             return self.getcfg(*args[1:], default_value=default_value, data=cur_data)
         return data
-    
-    def setcfg(self, *args, value: Any, data: Union[str, dict]='cfg_file') -> None:
-        """ 递归设置 conf 中的值。setcfg 不仅可用于设置 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+
+    def setcfg(self, *args, value: Any, data: str | dict = 'cfg_file') -> None:
+        """递归设置 conf 中的值。setcfg 不仅可用于设置 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
 
         :param args: 需要设置的参数，支持多级调用，若级不存在，会自动创建一个内缪的 dict。
         :param data: 提供一个 dict，否则使用 cfg_data。
@@ -287,7 +304,7 @@ class GlobalConfig(object):
                 data[arg0] = value
 
     def getdburi(self, *, r: int = None, bind_key: str = None):
-        """ 获取配置文件中保存的数据库配置。
+        """获取配置文件中保存的数据库配置。
         提供解析数据库路径的功能，方便直接使用 pymysql 的方法调用数据库。
         """
         dbbinds = self.getcfg('FLASK', 'SQLALCHEMY_BINDS')
@@ -312,8 +329,7 @@ class GlobalConfig(object):
             raise ValueError(f'[{uri}] is not valid!')
         port = parse_int(m.group('port'))
         if port is None:
-            raise ValueError(
-                f'[{uri}] is not valid: port should be of type int!')
+            raise ValueError(f'[{uri}] is not valid: port should be of type int!')
         return {
             'uri': uri,
             'host': m.group('host'),
@@ -323,8 +339,8 @@ class GlobalConfig(object):
             'database': m.group('database'),
         }
 
-    def encode_token(self, expire: int=86400, ts: int=None, **values: dict) -> str:
-        """ 使用 Fernet 算法加密一组值为 token 用于鉴权。
+    def encode_token(self, expire: int = 86400, ts: int = None, **kwargs: dict) -> str:
+        """使用 Fernet 算法加密一组值为 token 用于鉴权。
 
         :param expire: 过期时间，单位秒。 3600*24 = 86400。
         :param ts: 过期时间戳，单位秒。若不提供则使用 当前时间+expire。
@@ -336,11 +352,11 @@ class GlobalConfig(object):
             ts = int(time.time()) + expire
         if self.encrypter is None:
             self.encrypter = Encrypt(self.getcfg('FLASK', 'SECRET_KEY'))
-        values['ts'] = ts
-        return self.encrypter.encrypt(json.dumps(values))
+        kwargs['ts'] = ts
+        return self.encrypter.encrypt(json.dumps(kwargs))
 
     def decode_token(self, token: str) -> Dicto:
-        """ 解密使用 encode_token 加密的字符串。
+        """解密使用 encode_token 加密的字符串。
 
         :param token: 需要解密的 token 字符串。
 
@@ -351,10 +367,13 @@ class GlobalConfig(object):
             self.encrypter = Encrypt(self.getcfg('FLASK', 'SECRET_KEY'))
         tokenobj = json.loads(self.encrypter.decrypt(token))
         # 指示是否过期
-        tokenobj['expires'] = tokenobj.get('ts') < int(time.time())
+        now = int(time.time())
+        ts = tokenobj.get('ts')
+        tokenobj['expires'] = ts < now
+        tokenobj['difftime'] = ts - now
         return Dicto(tokenobj)
 
-    def init_regionals(self, data: Union[str, dict]='cfg_file') -> None:
+    def init_regionals(self, data: str | dict = 'cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)
         if isinstance(rlist, list):
             self.regional = RegionalConfig(rlist)

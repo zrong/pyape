@@ -84,14 +84,18 @@ class RedisCache(Cache):
         self.redis_uri = redis_uri
         self.__client = redis_client
         if not isinstance(self.__client, Redis):
-            raise ValueError('The redis_client must be a Redis instance!')
+            raise ValueError(f'{self!s} redis_client must be a Redis instance!')
         warnings.warn(f'GlobalCache USE {self!s}')
 
     def __getitem__(self, name: str):
         raw_value = self.__client.get(name)
         if raw_value is None:
             return None
-        return pickle.loads(raw_value, encoding='utf8')
+        try:
+            return pickle.loads(raw_value, encoding='utf8')
+        except pickle.UnpicklingError as e:
+            warnings.warn(f'{self!s}.pickle.loads {name=} error: {e!s}')
+            return None
 
     def __setitem__(self, name: str, value: Any):
         raw_value = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)

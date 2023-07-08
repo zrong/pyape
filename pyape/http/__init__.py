@@ -260,7 +260,7 @@ class RequestValue:
         return p
 
     def __repr__(self) -> str:
-        return f'<mjp.http.RequestValue>{self.request_args}'
+        return f'<pyape.http.RequestValue>{self.request_args}'
 
 
 class HTTPxMixIn:

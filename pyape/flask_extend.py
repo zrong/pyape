@@ -4,7 +4,8 @@ pyape.flask_extend
 
 对 Flask 框架进行扩展。
 """
-from typing import Callable, Union
+from typing import Callable, Any
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 
@@ -13,6 +14,7 @@ from flask import Flask, Response, request
 from flask.sessions import SecureCookieSessionInterface
 from werkzeug.datastructures import Headers
 from sqlalchemy.inspection import inspect
+from sqlalchemy.engine import Row, RowMapping, Result
 from redis.client import Redis
 
 from pyape.config import GlobalConfig, Dicto, RegionalConfig
@@ -20,7 +22,7 @@ from pyape.db import SQLAlchemy, DBManager
 
 
 class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
-    """ 修改 Flask 框架的默认 salt，并提供 Flask Session 的加解密功能。 """
+    """修改 Flask 框架的默认 salt，并提供 Flask Session 的加解密功能。"""
 
     def __init__(self) -> None:
         self.salt = 'pyape-cookie-session'
@@ -28,7 +30,7 @@ class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
 
     @classmethod
     def decode_flask_cookie(cls, secret_key: str, cookie: str):
-        """ 解码 flask cookie-session 字符串。"""
+        """解码 flask cookie-session 字符串。"""
         pscsi = cls()
         # get_signing_serializer 方法需要一个 Flask 实例，其中只需要包含 secret_key 即可。
         fake_app: Dicto = Dicto(secret_key=secret_key)
@@ -37,7 +39,7 @@ class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
 
     @classmethod
     def encode_flask_cookie(cls, secret_key: str, cookie: dict):
-        """ 将 dict 编码成 flask cookie-session 字符串。"""
+        """将 dict 编码成 flask cookie-session 字符串。"""
         pscsi = cls()
         # get_signing_serializer 方法需要一个 Flask 实例，其中只需要包含 secret_key 即可。
         fake_app: Dicto = Dicto(secret_key=secret_key)
@@ -46,8 +48,7 @@ class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
 
 
 class FlaskConfig(object):
-    """ flask.config.from_object 不支持 dict，因此建立这个 class。
-    """
+    """flask.config.from_object 不支持 dict，因此建立这个 class。"""
 
     # ALLOWED_EXTENSIONS = set([])
     BOOTSTRAP_SERVE_LOCAL = True
@@ -70,7 +71,7 @@ class FlaskConfig(object):
 
 
 class PyapeResponse(Response):
-    """ 自定义的响应，为所有的响应头加入跨域信息。 """
+    """自定义的响应，为所有的响应头加入跨域信息。"""
 
     # 默认的跨域数据
     # https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS
@@ -106,7 +107,7 @@ class PyapeResponse(Response):
 
     @property
     def cors_config(self):
-        """ 子类覆盖该方法，实现跨域
+        """子类覆盖该方法，实现跨域
 
         例如：
 
@@ -143,8 +144,8 @@ class PyapeFlask(Flask):
 
 
 class PyapeDB(SQLAlchemy):
-    """ 封装 pyape 使用的数据库方法。
-    
+    """封装 pyape 使用的数据库方法。
+
     :param app: PyapaFlask 的实例。
     :param dbinst: SQLAlchemy 或者 DBManager 的实例。
     """
@@ -161,7 +162,7 @@ class PyapeDB(SQLAlchemy):
     # 保存根据 regional 进行分类的表定义
     __regional_table_cls: dict = None
 
-    def __init__(self, app: PyapeFlask, dbinst: Union[SQLAlchemy, DBManager] = None):
+    def __init__(self, app: PyapeFlask, dbinst: SQLAlchemy | DBManager = None):
         self.__dynamic_table_cls = {}
         self.__regional_table_cls = {}
         self._app = app
@@ -202,7 +203,7 @@ class PyapeDB(SQLAlchemy):
         )
 
     def __get_dynamic_table_key(self, table_name: str, bind_key: str) -> str:
-        """ 获取一个用于存储动态生成的 table class 的键名。
+        """获取一个用于存储动态生成的 table class 的键名。
         键名是采用 bind_key 和 table_name 拼接而成，
         但 bind_key 会有 None 值的情况，将 None 值转换成为空字符串。
         """
@@ -210,7 +211,7 @@ class PyapeDB(SQLAlchemy):
         return f'{bind_prefix}_{table_name}'
 
     def get_dynamic_table(self, table_name: str, bind_key: str = None):
-        """ 获取动态表。"""
+        """获取动态表。"""
         return self.__dynamic_table_cls.get(
             self.__get_dynamic_table_key(table_name, bind_key)
         )
@@ -218,7 +219,7 @@ class PyapeDB(SQLAlchemy):
     def set_dynamic_table(
         self, build_table_method: Callable, table_name: str, bind_key: str = None
     ):
-        """ 获取动态表
+        """获取动态表
 
         :param table: 已经创建好的 table_cls
         :param build_table_method: 创建表的方法，接受两个参数，
@@ -235,7 +236,7 @@ class PyapeDB(SQLAlchemy):
     def build_regional_tables(
         self, name: str, build_table_method, rconfig: RegionalConfig
     ):
-        """ 根据 regionals 的配置创建多个表。
+        """根据 regionals 的配置创建多个表。
 
         :param name: 表的名称前缀。
         :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class。
@@ -261,7 +262,7 @@ class PyapeDB(SQLAlchemy):
     def get_regional_table(
         self, name: str, r: int, build_table_method, rconfig: RegionalConfig
     ):
-        """ 根据 regionals 和表名称前缀获取一个动态创建的表。
+        """根据 regionals 和表名称前缀获取一个动态创建的表。
 
         :param name: 表的名称前缀。
         :param r: regional。
@@ -282,9 +283,13 @@ class PyapeDB(SQLAlchemy):
         return Cls
 
     def result2dict(
-        self, result, keys, replaceobj=None, replaceobj_key_only=False
+        self,
+        result: dict | RowMapping | Row,
+        keys: Sequence[str],
+        replaceobj: dict = None,
+        replaceobj_key_only: bool = False,
     ) -> dict:
-        """ 根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict。
+        """根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict。
 
         :param result: 要转换的对象。
         :param keys: 要转换对象的key list。
@@ -292,32 +297,39 @@ class PyapeDB(SQLAlchemy):
         :param replaceobj_key_only: 仅包含可替换的键。
         :return: 转换成功的 dict。
         """
-        rst = {}
+        result_dict = {}
         for key in keys:
-            value = getattr(result, key)
+            value = (
+                result.get(key) if isinstance(result, dict) else getattr(result, key)
+            )
             if isinstance(value, datetime):
                 value = value.isoformat()
             elif isinstance(value, Decimal):
                 value = int(value)
             newkey = key
             if replaceobj:
-                # 仅使用 replaceobj 中提供的键名，这样在找不到键名的时候，newkey 的值为 None
+                # 仅使用 replaceobj 中提供的键名
+                # 这样在找不到键名的时候，newkey 的值为 None
                 if replaceobj_key_only:
                     newkey = replaceobj.get(key, None)
                 # 找不到对应键名，就使用原始键名
                 else:
                     newkey = replaceobj.get(key, key)
             if newkey:
-                rst[newkey] = value
-        return rst
+                result_dict[newkey] = value
+        return result_dict
 
     def to_response_data(
-        self, result, replaceobj=None, replaceobj_key_only=False, bind_key: str = None
+        self,
+        result: list | dict | Result | Row,
+        replaceobj: dict = None,
+        replaceobj_key_only: bool = False,
     ):
-        # zrong 2017-08-31
-        """ 把数据库查询出来的 ResultProxy 转换成 dict 或者 list，
-        仅支持 list 和 dict 类型，且不支持嵌套（dict 中的值不能包含 ResultProxy 对象）。
+        """把数据库查询出来的 ResultProxy 转换成标准的 dict 或者 list，
+        支持 Result/list[Row]/dict 类型，
+        dict 中的值不能包含嵌套的 ResultProxy 对象。
 
+        :param result: 要处理的对象，可以是 list[Row]/dict/Result/Row。
         :param replaceobj: 替换键名。
         :param replaceobj_key_only: 仅使用替换键名，丢掉非替换键名的键。
         """
@@ -328,33 +340,34 @@ class PyapeDB(SQLAlchemy):
                 self.to_response_data(item, replaceobj, replaceobj_key_only)
                 for item in result
             ]
-        # 这里直接将 dict 类型返回，是避免下面对 keys 方法的检查。因为 dict 也有 keys 方法
-        # dict 应该直接视为最终结果，不必再进行一次 key 的筛选
-        if isinstance(result, dict):
-            return result
-        # 转换 Model 到 dict
-        if self.isModel(result, bind_key):
-            return self.result2dict(
-                result,
-                inspect(result).mapper.column_attrs.keys(),
-                replaceobj,
-                replaceobj_key_only,
-            )
-        # zrong 2017-10-11
-        # 若使用 session.query 的方式查询，返回的结果是 <class 'sqlalchemy.util._collections.result'>
-        # 它是一个动态生成的 tuple 的子类，带有 keys() 方法
-        if callable(getattr(result, 'keys', None)):
+        elif isinstance(result, dict):
+            if replaceobj is None:
+                return result
             return self.result2dict(
                 result, result.keys(), replaceobj, replaceobj_key_only
+            )
+        elif isinstance(result, Result):
+            if replaceobj is None:
+                return [item._asdict() for item in result.all()]
+            return [
+                self.result2dict(item, item._fields, replaceobj, replaceobj_key_only)
+                for item in result.all()
+            ]
+        elif isinstance(result, Row):
+            if replaceobj is None:
+                return result._asdict()
+            return self.result2dict(
+                result, result._fields, replaceobj, replaceobj_key_only
             )
         return result
 
 
 class PyapeRedis:
-    """ 基于 flask-redis 修改
+    """基于 flask-redis 修改
     增加 根据 Regional 获取 redis client 的封装
     https://github.com/underyx/flask-redis
     """
+
     _gconf: GlobalConfig = None
     _rconf: RegionalConfig = None
 
@@ -400,7 +413,7 @@ class PyapeRedis:
             self.init_redis()
 
     def init_app(self, app: PyapeFlask, **kwargs):
-        """ 初始化 redis 连接，并将  REDIS 写入 Flask 的 extensions 对象。"""
+        """初始化 redis 连接，并将  REDIS 写入 Flask 的 extensions 对象。"""
         self.init_redis(**kwargs)
 
         if not hasattr(app, 'extensions'):
@@ -408,12 +421,12 @@ class PyapeRedis:
         app.extensions[self.config_prefix.lower()] = self
 
     def init_redis(self, **kwargs):
-        """ 仅初始化 redis 连接。"""
+        """仅初始化 redis 连接。"""
         self.provider_kwargs.update(kwargs)
         self._uri = self._gconf.getcfg(
-            self.config_uri, default_value='redis://localhost:6379/0')
-        self._client = Redis.from_url(
-            self._uri, **self.provider_kwargs)
+            self.config_uri, default_value='redis://localhost:6379/0'
+        )
+        self._client = Redis.from_url(self._uri, **self.provider_kwargs)
         self._update_binds()
 
     def _update_binds(self):
@@ -422,18 +435,19 @@ class PyapeRedis:
         if isinstance(self._uri_binds, dict):
             for bind_key, bind_uri in self._uri_binds.items():
                 self._client_binds[bind_key] = Redis.from_url(
-                    bind_uri, **self.provider_kwargs)
+                    bind_uri, **self.provider_kwargs
+                )
 
-    def get_uri(self, bind_key: str=None, miss_default: bool=False) -> str:
-        """ 获取一个 redis uri 地址。
+    def get_uri(self, bind_key: str = None, miss_default: bool = False) -> str:
+        """获取一个 redis uri 地址。
 
         :param bind_key: 绑定的值，可以为 None
         :param miss_default: 若找不到 bind_key 中的对应 uri，就使用默认的 self._uri。
         """
         return self._uri_binds.get(bind_key, self._uri if miss_default else None)
 
-    def get_client(self, bind_key: str=None, miss_default: bool=False) -> Redis:
-        """ 获取一个 redis client。
+    def get_client(self, bind_key: str = None, miss_default: bool = False) -> Redis:
+        """获取一个 redis client。
 
         :param bind_key: 绑定的值，可以为 None
         :param miss_default: 若找不到 bind_key 中的对应 client，就使用默认的 self._client。
@@ -443,8 +457,8 @@ class PyapeRedis:
     def get_clients(self) -> dict[str, Redis]:
         return self._client_binds
 
-    def get_regional_client(self, r: int, force: bool=True) -> Redis:
-        """ 根据 r 获取到一个 py_redis_client
+    def get_regional_client(self, r: int, force: bool = True) -> Redis:
+        """根据 r 获取到一个 py_redis_client
 
         :param r: regional
         :param force: 没有 redis 配置会抛出 ValueError 异常。若设置为 False 则返回 None（无异常）
@@ -458,8 +472,7 @@ class PyapeRedis:
         return self.get_client(robj.get('bind_key_redis'))
 
     def get_regional_clients(self):
-        """ 获取到一个以 regional 为键名的 py_redis_client dict
-        """
+        """获取到一个以 regional 为键名的 py_redis_client dict"""
         clients = {}
         rc_clients = self.get_clients()
         for r, robj in self._rconf.rdict.items():
@@ -470,8 +483,7 @@ class PyapeRedis:
 
 
 def flash_dict(d, category: str = 'message'):
-    """ 将 dict 中的每一项转换为一行进行 flash 输出
-    """
+    """将 dict 中的每一项转换为一行进行 flash 输出"""
     s = []
     for k, v in d.items():
         s.append(f'{k}: {", ".join(v)}')
@@ -479,8 +491,7 @@ def flash_dict(d, category: str = 'message'):
 
 
 def jinja_filter_strftimestamp(ts, fmt: str = None):
-    """ 将 timestamp 转换成为字符串。
-    """
+    """将 timestamp 转换成为字符串。"""
     # fmt = '%Y-%m-%d'
     dt = datetime.fromtimestamp(ts)
     if fmt is None:

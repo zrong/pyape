@@ -6,7 +6,7 @@
 
 from pkg_resources import resource_filename
 from pathlib import Path
-import tomli as tomllib
+import tomllib
 
 # pyape 安装所在的文件夹
 # module_dir = Path(resource_filename('pyape', '__init__.py')).parent
