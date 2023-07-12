@@ -20,7 +20,7 @@ from pythonjsonlogger import jsonlogger
 TEXT_LOG_FORMAT = """
 [%(asctime)s] %(levelname)s in %(module)s.%(funcName)s [%(pathname)s:%(lineno)d]:
 %(message)s"""
-JSON_LOG_FORMAT = r'%(levelname)s %(module)s %(funcName)s %(pathname)s %(lineno) %(threadName) %(processName) %(created) %(asctime) %(message)s'
+JSON_LOG_FORMAT = r'%(asctime) %(levelname)s %(module)s %(funcName)s %(pathname)s %(lineno) %(threadName) %(processName) %(created) %(message)s'
 
 
 class ZeroMQHandler(Handler):

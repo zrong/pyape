@@ -8,6 +8,10 @@ import pickle
 from typing import Any
 from redis.client import Redis
 from pyape import uwsgiproxy
+from pathlib import Path
+import tomllib, tomli_w
+import json
+import time
 
 
 class Cache(object):
@@ -17,6 +21,76 @@ class Cache(object):
     """ 保存缓存的类型，目前支持三种缓存： uwsgi/dict/redis。"""
     def __init__(self, ctype: str):
         self.ctype = ctype
+
+
+class DictCache(Cache):
+    """ 使用一个 Python Dict 保存缓存
+    仅用于测试，应该在 单线程/单进程 本地环境使用
+    """
+    def __init__(self):
+        super().__init__('dict')
+        self.__g = {}
+        warnings.warn(f'GlobalCache USE {self!s}')
+
+    def __getitem__(self, name):
+        return self.__g.get(name)
+
+    def __setitem__(self, name, value):
+        self.__g[name] = value
+
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__} {id(self.__g)}'
+
+
+class FileCache(Cache):
+    """  使用一个本地文件作为缓存。"""
+
+    ftype: str = '.toml'
+    """ 默认的本地文件类型，支持 toml/json/pickle"""
+
+    fpath: Path = None
+
+    def __init__(self, fpath: Path, ftype: str = None):
+        super().__init__('file')
+        self.fpath = fpath
+        self.ftype = ftype or fpath.suffix
+        if self.fpath is None:
+            raise ValueError('FileCache need a file!')
+        warnings.warn(f'GlobalCache USE {self!s}')
+        self.get_cache()
+
+    def get_cache(self) -> dict:
+        if not self.fpath.exists():
+            self.fpath.touch()
+            return {'@cache_created': time.time()}
+        if self.ftype == '.toml':
+            return tomllib.loads(self.fpath.read_text(encoding='utf-8'))
+        elif self.ftype == '.json':
+            return json.loads(self.fpath.read_text(encoding='utf-8'))
+        elif self.ftype == '.pickle':
+            return pickle.loads(self.fpath.read_bytes(), encoding='utf-8')
+        raise ValueError('FileCache.get_cache only supports .toml/.json/.pickle!')
+
+    def set_cache(self, cache_data: dict) -> int:
+        if self.ftype == '.toml':
+            return self.fpath.write_text(tomli_w.dumps(cache_data), encoding='utf-8')
+        elif self.ftype == '.json':
+            return self.fpath.write_text(json.dumps(cache_data), encoding='utf-8')
+        elif self.ftype == '.pickle':
+            return self.fpath.write_bytes(pickle.dumps(cache_data, pickle.HIGHEST_PROTOCOL))
+        raise ValueError('FileCache.set_cache only supports .toml/.json/.pickle!')
+
+    def __getitem__(self, name):
+        return self.get_cache().get(name)
+
+    def __setitem__(self, name, value):
+        c = self.get_cache()
+        c['@cache_updated'] = time.time()
+        c[name] = value
+        self.set_cache(c)
+
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__} {self.fpath.as_posix()} ftype: {self.ftype}'
 
 
 class UwsgiCache(Cache):
@@ -55,25 +129,6 @@ class UwsgiCache(Cache):
 
     def __str__(self) -> str:
         return f'{self.__class__.__name__}'
-
-
-class DictCache(Cache):
-    """ 使用一个 Python Dict 保存缓存
-    仅用于测试，应该在 单线程/单进程 本地环境使用
-    """
-    def __init__(self):
-        super().__init__('dict')
-        self.__g = {}
-        warnings.warn(f'GlobalCache USE {self!s}')
-
-    def __getitem__(self, name):
-        return self.__g.get(name)
-
-    def __setitem__(self, name, value):
-        self.__g[name] = value
-
-    def __str__(self) -> str:
-        return f'{self.__class__.__name__} {id(self.__g)}'
 
 
 class RedisCache(Cache):
@@ -118,11 +173,15 @@ class GlobalCache(object):
         self.cache = cache
 
     @classmethod
-    def from_config(cls, ctype, **kwargs):
+    def from_config(cls, ctype: str, **kwargs):
         """ 获取一个 Cache 实例
         """
         if ctype == 'uwsgi':
             return cls(UwsgiCache())
+        elif ctype == 'file':
+            fpath = kwargs.get('fpath')
+            ftype = kwargs.get('ftype')
+            return cls(FileCache(fpath, ftype))
         elif ctype == 'redis':
             # 优先确认 redis_client 参数
             redis_client = kwargs.get('redis_client')
@@ -142,11 +201,11 @@ class GlobalCache(object):
         return cls(DictCache())
 
     @property
-    def ctype(self):
+    def ctype(self) -> str:
         return self.cache.ctype
 
-    def keyname(self, r, name):
-        return f'{r}_{name}'
+    def keyname(self, r: int, name: str):
+        return f'{r}_{name!s}'
 
     def getg(self, name, r=0):
         """ 默认使用 0 这个r值，代表不区分 r

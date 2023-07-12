@@ -61,8 +61,9 @@ class Deploy(object):
         # files.exists 仅接受字符串
         if isinstance(file, Path):
             file = file.resolve().as_posix()
-            command = f'test -e "$(echo {file})"'
-            return self.conn.run(command, hide=True, warn=True).ok
+        command = f'test -e "$(echo {file})"'
+        logger.info(f'{command=}')
+        return self.conn.run(command, hide=True, warn=True).ok
 
     def make_remote_dir(self, *args):
         """ 创建部署文件夹
@@ -130,10 +131,10 @@ class Deploy(object):
         """
         remote_venv_dir = self.get_remote_path('venv')
         if not self.remote_exists(remote_venv_dir):
-            self.conn.run('{} -m venv {}'.format(self.pye, remote_venv_dir))
-        with self.conn.prefix('source {}/bin/activate'.format(remote_venv_dir)):
+            self.conn.run(f'{self.pye} -m venv {remote_venv_dir}')
+        with self.conn.prefix(f'source {remote_venv_dir}/bin/activate'):
             self.conn.run('pip install -U pip')
-            self.conn.run('pip install -r {}'.format(self.get_remote_path(req_path)))
+            self.conn.run(f'pip install -r {self.get_remote_path(req_path)}')
 
     def piplist(self, format='columns'):
         """ 获取虚拟环境中的所有安装的 python 模块

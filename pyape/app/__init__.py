@@ -19,9 +19,14 @@ from pyape import uwsgiproxy, errors
 from pyape.config import GlobalConfig
 from pyape.cache import GlobalCache
 from pyape.logging import get_logging_handler, get_pyzog_handler
-from pyape.flask_extend import PyapeFlask, PyapeResponse, \
-    FlaskConfig, PyapeDB, PyapeRedis, \
-    jinja_filter_strftimestamp
+from pyape.flask_extend import (
+    PyapeFlask,
+    PyapeResponse,
+    FlaskConfig,
+    PyapeDB,
+    PyapeRedis,
+    jinja_filter_strftimestamp,
+)
 
 
 # 全局配置对象
@@ -41,9 +46,8 @@ gcache: GlobalCache = None
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def init_db(pyape_app: PyapeFlask, create_args: dict=None):
-    """ 初始化 SQLAlchemy 数据库支持。
-    """
+def init_db(pyape_app: PyapeFlask, create_args: dict = None):
+    """初始化 SQLAlchemy 数据库支持。"""
     sql_uri = pyape_app._gconf.getcfg('SQLALCHEMY', 'URI')
     if sql_uri is None:
         return
@@ -56,9 +60,8 @@ def init_db(pyape_app: PyapeFlask, create_args: dict=None):
     pyape_app._gdb = gdb
 
 
-def init_redis(pyape_app: PyapeFlask, create_args: dict=None):
-    """ 初始化 REDIS ，配置文件中包含 REDIS_URI 才进行初始化
-    """
+def init_redis(pyape_app: PyapeFlask, create_args: dict = None):
+    """初始化 REDIS ，配置文件中包含 REDIS_URI 才进行初始化"""
     redis_uri = pyape_app._gconf.getcfg('REDIS', 'URI')
     if redis_uri is None:
         return
@@ -68,9 +71,8 @@ def init_redis(pyape_app: PyapeFlask, create_args: dict=None):
     grc = PyapeRedis(app=pyape_app)
 
 
-def init_logger(pyape_app: PyapeFlask, create_args: dict=None):
-    """ 设置 Flask app 和 sqlalchemy 的logger
-    """
+def init_logger(pyape_app: PyapeFlask, create_args: dict = None):
+    """设置 Flask app 和 sqlalchemy 的logger"""
     flasklogger = pyape_app.logger
     sqlalchemylogger = logging.getLogger('sqlalchemy')
     # 删除 Flask 的默认 Handler
@@ -87,7 +89,12 @@ def init_logger(pyape_app: PyapeFlask, create_args: dict=None):
         else:
             logger_name = f'app.{name}'
         level = logging.INFO
-        handler = get_pyzog_handler(logger_name, pyape_app._gconf.getcfg('LOGGER'), pyape_app._gconf.getdir('logs'), level=level)
+        handler = get_pyzog_handler(
+            logger_name,
+            pyape_app._gconf.getcfg('LOGGER'),
+            pyape_app._gconf.getdir('logs'),
+            level=level,
+        )
 
     flasklogger.setLevel(level)
     sqlalchemylogger.setLevel(logging.WARNING)
@@ -95,25 +102,27 @@ def init_logger(pyape_app: PyapeFlask, create_args: dict=None):
         log.addHandler(handler)
 
 
-def init_cache(pyape_app: PyapeFlask, create_args: dict=None):
-    """ 初始化全局缓存对象。
-    """
+def init_cache(pyape_app: PyapeFlask, create_args: dict = None):
+    """初始化全局缓存对象。"""
     global gcache
     if gcache is not None:
         raise ValueError('global cache 不能重复定义！')
-    ctype = None
+    cache_type = None
+    kwargs = {}
     if grc is None:
         if uwsgiproxy.in_uwsgi:
-            ctype = 'uwsgi'
+            cache_type = 'uwsgi'
         else:
-            ctype = 'dict'
+            cache_type = 'file'
+            kwargs['fpath'] = pyape_app._gconf.getdir('cache.toml')
     else:
-        ctype = 'redis'
-    gcache = GlobalCache.from_config(ctype, grc=grc)
+        cache_type = 'redis'
+        kwargs['grc'] = grc
+    gcache = GlobalCache.from_config(cache_type, **kwargs)
 
 
 def register_blueprint(pyape_app, rest_package, rest_package_names) -> None:
-    """ 注册 Blueprint，必须在 gdb 的创建之后调用。
+    """注册 Blueprint，必须在 gdb 的创建之后调用。
 
     :param app: flask app 实例
     :param rest_package: 父包名
@@ -129,13 +138,14 @@ def register_blueprint(pyape_app, rest_package, rest_package_names) -> None:
 
 
 def _build_kwargs_for_app(gconf: GlobalConfig):
-    """ 将本地所有路径转换为绝对路径，以保证其在任何环境下可用。
-    """
+    """将本地所有路径转换为绝对路径，以保证其在任何环境下可用。"""
     kwargs = {
-            'static_url_path': gconf.getcfg('PATH', 'STATIC_URL_PATH', default_value=''),
-            'static_folder': gconf.getcfg('PATH', 'STATIC_FOLDER', default_value='static'),
-            'template_folder': gconf.getcfg('PATH', 'TEMPLATE_FOLDER', default_value='templates')
-        }
+        'static_url_path': gconf.getcfg('PATH', 'STATIC_URL_PATH', default_value=''),
+        'static_folder': gconf.getcfg('PATH', 'STATIC_FOLDER', default_value='static'),
+        'template_folder': gconf.getcfg(
+            'PATH', 'TEMPLATE_FOLDER', default_value='templates'
+        ),
+    }
 
     instance_path = gconf.getcfg('PATH', 'INSTANCE_PATH')
     if instance_path:
@@ -143,7 +153,9 @@ def _build_kwargs_for_app(gconf: GlobalConfig):
     else:
         kwargs['instance_path'] = gconf.getdir().resolve().as_posix()
 
-    kwargs['template_folder'] = gconf.getdir(kwargs['template_folder']).resolve().as_posix()
+    kwargs['template_folder'] = (
+        gconf.getdir(kwargs['template_folder']).resolve().as_posix()
+    )
     kwargs['static_folder'] = gconf.getdir(kwargs['static_folder']).resolve().as_posix()
     return kwargs
 
@@ -154,10 +166,9 @@ _default_create_args = dict(
     ConfigClass=FlaskConfig,
     error_handler=False,
 )
-def create_app(
-        gconf: GlobalConfig,
-        create_args: dict = {}
-    ):
+
+
+def create_app(gconf: GlobalConfig, create_args: dict = {}):
     """
     根据不同的配置创建 app。
 
@@ -191,7 +202,7 @@ def create_app(
     return pyape_app
 
 
-def _init_common(gconf: GlobalConfig=None, create_args: dict=None) -> PyapeFlask:
+def _init_common(gconf: GlobalConfig = None, create_args: dict = None) -> PyapeFlask:
     if gconf is None:
         gconf = GlobalConfig(Path.cwd())
     sys.modules[__name__].__dict__['gconfig'] = gconf
@@ -207,12 +218,14 @@ def _init_common(gconf: GlobalConfig=None, create_args: dict=None) -> PyapeFlask
     init_logger(pyape_app, create_args)
     # cache 可能会使用 redis，因此顺序在 redis 初始化之后
     init_cache(pyape_app, create_args)
-    
+
     return pyape_app
 
 
-def init(gconf: GlobalConfig=None, init_app_method=None, create_args: dict=None) -> PyapeFlask:
-    """ 初始化 APP。
+def init(
+    gconf: GlobalConfig = None, init_app_method=None, create_args: dict = None
+) -> PyapeFlask:
+    """初始化 APP。
 
     :param gconf: ``pyape.config.GlobalConfig`` 的实例。
     :param init_app: 外部初始化方法。
@@ -232,8 +245,8 @@ def init(gconf: GlobalConfig=None, init_app_method=None, create_args: dict=None)
     return pyape_app
 
 
-def init_decorator(gconf: GlobalConfig=None, create_args: dict=None):
-    """ 初始化 APP 的装饰器版本。
+def init_decorator(gconf: GlobalConfig = None, create_args: dict = None):
+    """初始化 APP 的装饰器版本。
 
     :param gconf: ``pyape.config.GlobalConfig`` 的实例。
     :param init_app: 外部初始化方法。
