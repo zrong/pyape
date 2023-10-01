@@ -1,5 +1,5 @@
 """
-pyape
+The Python Application Programming Environment.
 ~~~~~~~~~~~~~~~~~~~
 
 仅包含常量。
