@@ -13,6 +13,7 @@ from typing import Any, Optional
 import tomllib
 import tomli_w
 from pyape.tpl import base_dir as pyape_tpl_dir
+from pyape.error import ConfigError, ErrorCode
 from pyape.config import merge_dict
 
 
@@ -25,8 +26,10 @@ class ConfigWriter(object):
     exists_before_write: bool = False
     """ 在写入文件前，该文件是否存在。"""
 
-    def __init__(self, tpl_name: str, dst_file: Path, replace_obj: dict, tpl_dir: Optional[Path]) -> None:
-        """ 初始化
+    def __init__(
+        self, tpl_name: str, dst_file: Path, replace_obj: dict, tpl_dir: Optional[Path]
+    ) -> None:
+        """初始化
         :param tplname: 模版名称，不含扩展名
         :param dstname: 目测名称
         """
@@ -37,27 +40,27 @@ class ConfigWriter(object):
         self.tpl_dir = tpl_dir or pyape_tpl_dir
 
     def _write_by_jinja(self):
-        """ 调用 jinja2 直接渲染
-        """
+        """调用 jinja2 直接渲染"""
         tplenv = jinja2.Environment(loader=jinja2.FileSystemLoader(self.tpl_dir))
         tpl = tplenv.get_template(self.tpl_filename)
         self.dst_file.write_text(tpl.render(self.replace_obj))
-    
+
     def _write_key_value(self):
-        """ 输出 key = value 形式的文件
-        """
+        """输出 key = value 形式的文件"""
         txt = '\n'.join([f'{k} = {v}' for k, v in self.replace_obj.items()])
         self.dst_file.write_text(txt)
 
-    def write_config_file(self, force: bool=True):
-        """ 写入配置文件
+    def write_config_file(self, force: bool = True):
+        """写入配置文件
         :param force: 若 force 为 False，则仅当文件不存在的时候才写入。
         """
         self.exists_before_write = self.dst_file.exists()
         if not force and self.exists_before_write:
             return
         if self.tpl_name.endswith('.json'):
-            self.dst_file.write_text(json.dumps(self.replace_obj, ensure_ascii=False, indent=4))
+            self.dst_file.write_text(
+                json.dumps(self.replace_obj, ensure_ascii=False, indent=4)
+            )
         elif self.tpl_name.endswith('.toml'):
             self.dst_file.write_text(tomli_w.dumps(self.replace_obj))
         elif self.tpl_name == '.env':
@@ -78,9 +81,8 @@ class ConfigReplacer(object):
     replace_environ: list[str] = None
     writer: ConfigWriter = None
 
-    def __init__(self, env_name, pyape_conf, work_dir: Path, tpl_dir: Path=None):
-        """ 初始化
-        """
+    def __init__(self, env_name, pyape_conf, work_dir: Path, tpl_dir: Path = None):
+        """初始化"""
         self.env_name = env_name
         self.pyape_conf = pyape_conf
         self.envs = pyape_conf['ENV']
@@ -93,19 +95,22 @@ class ConfigReplacer(object):
 
     def check_env_name(self):
         if self.env_name is None:
-            raise ValueError('Please provide a env.')
+            raise ConfigError('Please provide a env.', ErrorCode.ENV_NAME)
         keys = self.envs.keys()
-        if not self.env_name in self.envs: 
-            raise ValueError('env must be in follow values: \n\n{}'.format('\n'.join(keys)))
+        if not self.env_name in self.envs:
+            raise ConfigError(
+                'env must be in follow values: \n\n{}'.format('\n'.join(keys)),
+                ErrorCode.ENV_NAME,
+            )
 
     def get_env_value(self, key=None, default_value=None):
         value = self.envs.get(self.env_name)
         if value and key is not None:
             return value.get(key, default_value)
         return value
-        
+
     def _set_replace_keys(self):
-        """ name 和 deploy_dir 的值允许作为替换值使用，但这两个值中也可能包含替换值，因此需要先固化下来"""
+        """name 和 deploy_dir 的值允许作为替换值使用，但这两个值中也可能包含替换值，因此需要先固化下来"""
         self.pyape_name = self.get_tpl_value('NAME', merge=False)
         # 获取被 env 合并后的值
         deploy_dir = self.get_tpl_value('DEPLOY_DIR', merge=False)
@@ -113,11 +118,15 @@ class ConfigReplacer(object):
         deploy_dir = self.replace(deploy_dir)
         self.deploy_dir = Path(deploy_dir)
         if not self.deploy_dir.is_absolute():
-            raise ValueError('DEPLOY_DIR must be a absolute path!')
+            raise ConfigError(
+                'DEPLOY_DIR must be a absolute path!', code=ErrorCode.DEPLOY_DIR
+            )
         self.replace_environ = self.get_tpl_value('REPLACE_ENVIRON', merge=False)
 
-    def get_tpl_value(self, tpl_name: str, merge: bool=True, wrap_key: str=None) -> Any:
-        """ 获取配置模版中的值
+    def get_tpl_value(
+        self, tpl_name: str, merge: bool = True, wrap_key: str = None
+    ) -> Any:
+        """获取配置模版中的值
         :param tpl_name: 配置模版的键名
         :param merge: 是否合并，对于已知的标量，应该选择不合并
         :param wrap_key: 是否做一个包装。如果提供，则会将提供的值作为 key 名，在最终值之上再包装一层
@@ -139,8 +148,7 @@ class ConfigReplacer(object):
         return {wrap_key: repl_obj} if wrap_key else repl_obj
 
     def replace(self, value: str) -> str:
-        """ 替换 value 中的占位符
-        """
+        """替换 value 中的占位符"""
         # 环境变量替换用
         environ_keys = {}
         # 替换 {NAME} 和 {WORK_DIR}
@@ -169,12 +177,15 @@ class ConfigReplacer(object):
         except KeyError as e:
             # 抛出对应的 environ key 的错误
             error_key = e.args[0]
-            raise ValueError(f'''error_key: {error_key}
+            raise ConfigError(
+                f'''error_key: {error_key}
 environ_keys: {environ_keys}
-replace_obj: {replace_obj}.''')
+replace_obj: {replace_obj}.''',
+                code=ErrorCode.REPLACE_KEY_ERROR,
+            )
 
     def get_replace_obj(self, tpl_name: str) -> dict:
-        """ 获取已经替换过所有值的对象。"""
+        """获取已经替换过所有值的对象。"""
         replace_obj = self.get_tpl_value(tpl_name)
         replace_str = tomli_w.dumps(replace_obj)
         # 将 obj 转换成 toml 字符串，进行一次替换，然后再转换回 obj
@@ -182,8 +193,14 @@ replace_obj: {replace_obj}.''')
         replace_obj = tomllib.loads(self.replace(replace_str))
         return replace_obj
 
-    def set_writer(self, tpl_name: str, force=True, target_postfix: str='', immediately: bool=True) -> tuple[Path, Path]:
-        """ 写入配置文件"""
+    def set_writer(
+        self,
+        tpl_name: str,
+        force=True,
+        target_postfix: str = '',
+        immediately: bool = True,
+    ) -> tuple[Path, Path]:
+        """写入配置文件"""
         replace_obj = self.get_replace_obj(tpl_name)
         # 不加后缀的文件路径
         target = self.work_dir.joinpath(tpl_name)

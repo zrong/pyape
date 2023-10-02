@@ -116,7 +116,7 @@ class Dicto(dict):
                 parent[k] = v
 
 
-class RegionalConfig(object):
+class RegionalConfig:
     """为 Regional 机制提供的配置文件，用于解析 Regional 配置。"""
 
     rlist: list = None
@@ -190,7 +190,7 @@ class RegionalConfig(object):
         return None
 
 
-class GlobalConfig(object):
+class GlobalConfig:
     """全局配置文件，对应 config.toml"""
 
     cfg_data: dict = None

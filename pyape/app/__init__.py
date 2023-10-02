@@ -15,11 +15,12 @@ import flask
 
 from flask_compress import Compress
 
-from pyape import uwsgiproxy, errors
+from pyape import uwsgiproxy
 from pyape.config import GlobalConfig
 from pyape.cache import GlobalCache
+from pyape.flask import errors
 from pyape.logging import get_logging_handler, get_pyzog_handler
-from pyape.flask_extend import (
+from pyape.flask.extend import (
     PyapeFlask,
     PyapeResponse,
     FlaskConfig,

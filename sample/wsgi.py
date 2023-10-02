@@ -10,7 +10,7 @@ except ImportError:
 
 import pyape.app
 import pyape.config
-from pyape.flask_extend import PyapeFlask, PyapeResponse
+from pyape.flask.extend import PyapeFlask, PyapeResponse
 
 # 工作文件夹
 work_dir = Path(__file__).parent.resolve()

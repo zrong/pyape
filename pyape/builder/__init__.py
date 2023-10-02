@@ -4,25 +4,30 @@
 # created: 2022-02-06
 ###########################################
 
-from pkg_resources import resource_filename
 from pathlib import Path
 import tomllib
+from enum import StrEnum
 
-# pyape 安装所在的文件夹
-# module_dir = Path(resource_filename('pyape', '__init__.py')).parent
-# 找到 tpl 文件夹所在地
-# tpl_dir = module_dir.joinpath('tpl')
 
-# 使用 pyape copy 复制所有文件
-MAIN_PROJECT_FILES = {
-    'wsgi': 'wsgi.py',
-    'readme': 'README.md',
-    'pyape': 'pyape.toml',
-    'gitignore': '.gitignore',
-}
+class MainProjectFile(StrEnum):
+    wsgi = 'wsgi.py'
+    readme = 'README.md'
+    pyape = 'pyape.toml'
+    gitignore = '.gitignore'
 
-MAIN_CONFIG_FILES = ['config.toml', '.env', 'uwsgi.ini', 'gunicorn.conf.py', 'gunicorn_nginx.conf']
-SUPERVISOR_TPL_FILES = ['supervisor_program.conf', 'supervisord.service', 'supervisord.conf']
+
+class MainConfigFile(StrEnum):
+    config = 'config.toml'
+    env = '.env'
+    uwsgi = 'uwsgi.ini'
+    gunicorn = 'gunicorn.conf.py'
+    gunicorn_nginx = 'gunicorn_nginx.conf'
+
+
+class SupervisorTplFile(StrEnum):
+    PROGRAM = 'supervisor_program.conf'
+    SERVICE = 'supervisord.service'
+    CONF = 'supervisord.conf'
 
 
 def get_pyape_toml_file(cwd: Path=None) -> Path:

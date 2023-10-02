@@ -14,7 +14,7 @@ from invoke import runners
 from invoke.exceptions import Exit
 from fabric import Connection
 
-from pyape.builder import MAIN_CONFIG_FILES
+from pyape.builder import MainConfigFile
 from pyape.builder.conf import  ConfigReplacer
 
 from . import logger, rsync
@@ -194,8 +194,8 @@ class Deploy(object):
                 logger.warning(f'删除本地临时文件 {final_file.as_posix()}')
             
     def put_config(self, force: bool=False) -> None:
-        for tpl_name in MAIN_CONFIG_FILES:
-            self.put_tpl(tpl_name, force)
+        for tpl_name in MainConfigFile.__members__.values():
+            self.put_tpl(tpl_name.value, force)
 
     def rsync(self, exclude=[], is_windows=False):
         """ 部署最新程序到远程服务器

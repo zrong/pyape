@@ -8,7 +8,7 @@ vo = ValueObject 用于存储所有量不大的值对象
 """
 
 import json
-import tomli as tomllib
+import tomllib
 import tomli_w
 
 from sqlalchemy.sql.expression import or_

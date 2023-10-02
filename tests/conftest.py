@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
 
-import tomli as tomllib
+import tomllib
 import pytest
 
 from pyape.config import GlobalConfig
-from pyape.flask_extend import PyapeFlask
+from pyape.flask.extend import PyapeFlask
 
 # 加入 sample 的路径以便测试
 sample_path: Path = Path(__file__).parent.parent.joinpath('sample').resolve()
