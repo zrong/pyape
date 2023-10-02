@@ -7,8 +7,8 @@ import shutil
 from dataclasses import dataclass
 from typing import Annotated, TYPE_CHECKING
 from pathlib import Path
+from enum import StrEnum
 
-import click
 import typer
 from rich.console import Console
 
@@ -56,12 +56,10 @@ def check_pyape_toml(ctx: typer.Context) -> dict:
 
 def write_config_file(
     ctx: typer.Context,
-    pyape_conf: dict,
     tpl_name: str,
     /,
     tpl_dir: Path = None,
     target_postfix: str = '',
-    force: bool = True,
 ) -> None:
     """写入配置文件
 
@@ -69,15 +67,16 @@ def write_config_file(
     """
     try:
         replacer = ConfigReplacer(
-            global_state.env, pyape_conf, work_dir=global_state.cwd, tpl_dir=tpl_dir
+            global_state.env,
+            global_state.pyape_conf,
+            work_dir=global_state.cwd,
+            tpl_dir=tpl_dir,
         )
-        replacer.set_writer(tpl_name, force, target_postfix)
-        if not force and replacer.writer.exists_before_write:
-            st = click.style(
-                f'文件 {replacer.writer.dst_file.as_uri()} 已存在。可使用 --force 参数强制覆盖。',
-                fg='red',
+        replacer.set_writer(tpl_name, global_state.force, target_postfix)
+        if not global_state.force and replacer.writer.exists_before_write:
+            console.print(
+                f'[red]文件 {replacer.writer.dst_file.as_uri()} 已存在。可使用 --force 参数强制覆盖。',
             )
-            click.echo(st)
     except ConfigError as e:
         if e.code == ErrorCode.ENV_NAME:
             ctx.fail(f'{e.message} 使用 pyape --env 指定一个存在的名称！')
@@ -86,19 +85,20 @@ def write_config_file(
         ctx.fail(str(e))
 
 
-def copytplfile(srcdir, dstdir, keyname, filename, force=False, rename=False):
-    """复制文件到目标文件夹
+def copytplfile(main_project_file: MainProjectFile, rename: bool = False):
+    """复制文件到目标文件夹。
 
-    :param srcdir: 源文件夹
-    :param dstdir: 目标文件夹
-    :param keyname: 文件 key 名称，files 的 key
-    :param filename: 文件名称，files 的 value
-    :param force: 是否强制覆盖已存在文件
     :param rename: 若文件已存在是否重命名
     """
+    keyname = main_project_file.name
+    filename = main_project_file.value
+
     split_path = keyname.split('/')
-    dstfiledir = dstdir
-    srcfiledir = srcdir
+
+    # 源文件夹
+    srcfiledir = pyape_tpl_dir
+    # 目标文件夹
+    dstfiledir = global_state.cwd
     while len(split_path) > 1:
         # 检测是否拥有中间文件夹，若有就创建它
         dstfiledir = dstfiledir.joinpath(split_path[0])
@@ -111,26 +111,23 @@ def copytplfile(srcdir, dstdir, keyname, filename, force=False, rename=False):
     dstfile = dstfiledir / filename
 
     if dstfile.exists():
-        if force:
+        if global_state.force:
             shutil.copyfile(srcfile, dstfile)
-            console.print(f'复制 [red]{srcfile}[/] 到 [red]{dstfile}[/]')
+            console.print(f'覆盖 [red]{srcfile}[/] 到 [red]{dstfile}[/]')
         elif rename:
             dstbak = dstfile.parent.joinpath(dstfile.name + '.bak')
             if dstbak.exists():
-                st = click.style('备份文件 {0} 已存在！请先删除备份文件。'.format(dstbak), fg='red')
-                click.echo(st, err=True)
+                console.print(f'备份文件 [red]{dstbak}[/] 已存在！请先删除备份文件。')
             else:
                 shutil.move(dstfile, dstbak)
-                st = click.style('备份文件 {0} 到 {1}'.format(dstfile, dstbak), fg='yellow')
-                click.echo(st)
+                console.print(f'备份文件 [yellow]{dstfile}[/] 到 [yellow]{dstbak}[/]')
                 shutil.copyfile(srcfile, dstfile)
-                click.echo('复制 {0} 到 {1}'.format(srcfile, dstfile))
+                console.print(f'复制 {srcfile} 到 {dstfile}')
         else:
-            st = click.style('文件 {0} 已存在！'.format(dstfile), fg='red')
-            click.echo(st, err=True)
+            console.print(f'文件 [red]{dstfile}[/] 已存在！')
     else:
         shutil.copyfile(srcfile, dstfile)
-        click.echo('复制 {0} 到 {1}'.format(srcfile, dstfile))
+        console.print(f'复制 [red]{srcfile}[/] 到 [red]{dstfile}[/]！')
 
 
 def build_deploy_conn(ctx: typer.Context) -> 'Deploy':
@@ -188,16 +185,20 @@ def main_callback(
 
 
 @main.command('init')
-def main_init():
-    """「本地」初始化 pyape 项目。"""
-    for keyname, filename in MainProjectFile.__members__.items():
+def main_init(
+    name: Annotated[
+        list[StrEnum('MainProjectName', list(MainProjectFile.__members__.keys()))],
+        typer.Argument(help='不提供责初始化所有项目文件。否则按照提供的项目文件 KEY 单独处理。'),
+    ] = None,
+    rename: Annotated[bool, typer.Option(help='若目标文件存在则重命名。')] = False,
+):
+    """「本地」初始化 pyape 项目，支持单独初始化部分项目文件功能。"""
+    if not name:
+        name = tuple(MainProjectFile.__members__.keys())
+    for keyname in name:
         copytplfile(
-            pyape_tpl_dir,
-            global_state.cwd,
-            keyname,
-            filename.value,
-            global_state.force,
-            False,
+            MainProjectFile[keyname],
+            rename,
         )
 
 
@@ -248,7 +249,6 @@ def venv_outdated(ctx: typer.Context):
     d.pipoutdated()
 
 
-
 # ---------------------------- 子命令 uwsgi
 @sub_uwsgi.command('top')
 def uwsgi_top(
@@ -261,8 +261,8 @@ def uwsgi_top(
     pyape.uwsgitop.call(address, frequency)
 
 
-
 # ---------------------------- 子命令 conf
+
 
 @sub_conf.callback()
 def conf_main_callback(
@@ -275,7 +275,8 @@ def conf_main_callback(
 def conf_make(
     ctx: typer.Context,
     file: Annotated[
-        list[MainConfigFile], typer.Argument(help='提供支持的配置文件名称。', show_default=False)
+        list[MainConfigFile],
+        typer.Argument(help='提供支持的配置文件名称。', show_default=False, show_choices=True),
     ],
     env_postfix: Annotated[bool, typer.Option(help='在生成的配置文件名称末尾加上环境名称后缀。')] = False,
 ):
@@ -286,46 +287,9 @@ def conf_make(
     for tpl_name in config_files:
         write_config_file(
             ctx,
-            pyape_conf,
             tpl_name.value,
             target_postfix=f'.{global_state.env}' if env_postfix else '',
-            force=global_state.force,
         )
-
-
-@sub_conf.command('copy')
-def conf_copy(
-    name: Annotated[list[str], typer.Argument(help='待处理的配置文件名称。')] = None,
-    rename: Annotated[bool, typer.Option(help='若目标文件存在则重命名')] = False,
-):
-    """「本地」复制 pyape 配置文件到当前项目中"""
-    if len(name) == 0:
-        for key, tplfile in MainConfigFile.__members__.items():
-            copytplfile(
-                pyape_tpl_dir,
-                global_state.cwd,
-                key,
-                tplfile.value,
-                global_state.force,
-                rename,
-            )
-    else:
-        for key in name:
-            if not key in MainConfigFile.__members__.keys():
-                st = click.style(
-                    '仅支持以下名称： {0}'.format(' '.join(MainConfigFile.__members__.keys())),
-                    fg='red',
-                )
-                click.echo(st, err=True)
-                continue
-            copytplfile(
-                pyape_tpl_dir,
-                global_state.cwd,
-                key,
-                MainConfigFile[key],
-                global_state.force,
-                rename,
-            )
 
 
 @sub_conf.command('supervisor')
@@ -335,7 +299,7 @@ def conf_supervisor(
     """「本地」生成 Supervisor 需要的配置文件。"""
     pyape_conf = check_pyape_toml(ctx)
     for tpl_name in SupervisorTplFile.__members__.values():
-        write_config_file(ctx, pyape_conf, tpl_name.value, force=global_state.force)
+        write_config_file(ctx, tpl_name.value)
 
 
 @sub_conf.command('put')
@@ -347,8 +311,8 @@ def conf_put(
     d.put_config(force=global_state.force)
 
 
-
 # ---------------------------- 子命令 gen
+
 
 @sub_gen.command('password')
 def gen_password(
@@ -380,8 +344,8 @@ def gen_once(length: Annotated[int, typer.Argument(help='字符串位数。')] =
     console.print(gen.gen_nonce(k=length))
 
 
-
 # ---------------------------- 子命令 server
+
 
 @sub_server.command('deploy')
 def server_deploy(ctx: typer.Context):
