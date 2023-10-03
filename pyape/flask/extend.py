@@ -1,24 +1,41 @@
 """
-pyape.flask_extend
+pyape.flask.extend
 ----------------------
 
 对 Flask 框架进行扩展。
 """
-from typing import Callable, Any
-from collections.abc import Sequence
 from datetime import datetime
-from decimal import Decimal
+import logging
+import importlib
 
 import flask
+import flask.cli
+from flask_compress import Compress
 from flask import Flask, Response, request
 from flask.sessions import SecureCookieSessionInterface
 from werkzeug.datastructures import Headers
-from sqlalchemy.inspection import inspect
-from sqlalchemy.engine import Row, RowMapping, Result
-from redis.client import Redis
 
-from pyape.config import GlobalConfig, Dicto, RegionalConfig
-from pyape.db import SQLAlchemy, DBManager
+from pyape.config import GlobalConfig, Dicto
+from pyape.flask import errors
+from pyape.application import CreateArgument, PyapeApp, PyapeDB, FrameworkApp
+from pyape.db import DBManager, SQLAlchemy
+
+
+def flash_dict(d, category: str = 'message'):
+    """将 dict 中的每一项转换为一行进行 flash 输出"""
+    s = []
+    for k, v in d.items():
+        s.append(f'{k}: {", ".join(v)}')
+    flask.flash(' '.join(s), category)
+
+
+def jinja_filter_strftimestamp(ts, fmt: str = None):
+    """将 timestamp 转换成为字符串。"""
+    # fmt = '%Y-%m-%d'
+    dt = datetime.fromtimestamp(ts)
+    if fmt is None:
+        return dt.isoformat()
+    return dt.strftime(fmt)
 
 
 class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
@@ -143,357 +160,154 @@ class PyapeFlask(Flask):
         )
 
 
-class PyapeDB(SQLAlchemy):
-    """封装 pyape 使用的数据库方法。
+class PyapeDBFlask(PyapeDB):
+    def __init__(self, app: PyapeApp, dbinst: SQLAlchemy | DBManager = None):
+        super().__init__(app, dbinst)
 
-    :param app: PyapaFlask 的实例。
-    :param dbinst: SQLAlchemy 或者 DBManager 的实例。
-    """
+        flask_app: Flask = app.app
 
-    _gconf: GlobalConfig = None
-    _app: PyapeFlask = None
-
-    # 根据 bind_key 动态生成的 table class，存储在这个 dict 中
-    # 位于 pyape.app.models 中的 valueobject 和 regional，
-    # 由于在框架内部，无法在项目建立的时候就知道数据库的数量，需要动态创建 table class
-    # 动态创建的 class 就保存在这个 dict 中
-    __dynamic_table_cls: dict = None
-
-    # 保存根据 regional 进行分类的表定义
-    __regional_table_cls: dict = None
-
-    def __init__(self, app: PyapeFlask, dbinst: SQLAlchemy | DBManager = None):
-        self.__dynamic_table_cls = {}
-        self.__regional_table_cls = {}
-        self._app = app
-        self._gconf = app._gconf
-
-        # 支持从一个已有的 dbinst 对象中共享 dbm 对象。用于项目中有多套 SQLAlchemy 的情况。
-        if isinstance(dbinst, SQLAlchemy):
-            super().__init__(dbm=dbinst.dbm, is_scoped=True, in_flask=True)
-        elif isinstance(dbinst, DBManager):
-            super().__init__(dbm=dbinst, is_scoped=True, in_flask=True)
-        else:
-            sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
-            sql_options = self._gconf.getcfg('SQLALCHEMY', 'ENGINE_OPTIONS')
-            super().__init__(
-                URI=sql_uri, ENGINE_OPTIONS=sql_options, is_scoped=True, in_flask=True
-            )
-        self._app.logger.info(f'self.Session {self.Session}')
-
-        @app.teardown_appcontext
+        @flask_app.teardown_appcontext
         def shutdown_session(response_or_exc):
-            # self._app.logger.info(f'PyapeDB.Session.remove: {self.Session}')
+            # flask_app.logger.info(f'PyapeDB.Session.remove: {self.Session}')
             # https://docs.sqlalchemy.org/en/14/orm/contextual.html
             self.Session.remove()
             return response_or_exc
 
-    def get_app(self, reference_app: PyapeFlask = None) -> PyapeFlask:
-        if reference_app is not None:
-            return reference_app
-        if flask.current_app:
-            # https://werkzeug.palletsprojects.com/en/2.0.x/local/#werkzeug.local.LocalProxy._get_current_object
-            return flask.current_app._get_current_object()
-        if self._app:
-            return self._app
-        raise RuntimeError(
-            'No application found. Either work inside a view function or push'
-            ' an application context. See'
-            ' http://flask-sqlalchemy.pocoo.org/contexts/.'
-        )
 
-    def __get_dynamic_table_key(self, table_name: str, bind_key: str) -> str:
-        """获取一个用于存储动态生成的 table class 的键名。
-        键名是采用 bind_key 和 table_name 拼接而成，
-        但 bind_key 会有 None 值的情况，将 None 值转换成为空字符串。
-        """
-        bind_prefix: str = bind_key or ''
-        return f'{bind_prefix}_{table_name}'
+_default_create_arg = CreateArgument(
+    FrameworkAppClass=PyapeFlask,
+    ResponseClass=PyapeResponse,
+    ConfigClass=FlaskConfig,
+    error_handler=False,
+)
+""" create_arg 的值
 
-    def get_dynamic_table(self, table_name: str, bind_key: str = None):
-        """获取动态表。"""
-        return self.__dynamic_table_cls.get(
-            self.__get_dynamic_table_key(table_name, bind_key)
-        )
-
-    def set_dynamic_table(
-        self, build_table_method: Callable, table_name: str, bind_key: str = None
-    ):
-        """获取动态表
-
-        :param table: 已经创建好的 table_cls
-        :param build_table_method: 创建表的方法，接受两个参数，
-            动态创建一个 Table Class，参见 ``pyape.app.models.valueobject.make_value_object_table_cls``。
-        """
-        key_name: str = self.__get_dynamic_table_key(table_name, bind_key)
-        table = self.get_dynamic_table(table_name, bind_key)
-        if table is not None:
-            raise KeyError(key_name)
-        table = build_table_method(table_name, bind_key)
-        self.__dynamic_table_cls[key_name] = table
-        return table
-
-    def build_regional_tables(
-        self, name: str, build_table_method, rconfig: RegionalConfig
-    ):
-        """根据 regionals 的配置创建多个表。
-
-        :param name: 表的名称前缀。
-        :param build_table_method: 创建表的方法，接受两个参数，动态创建一个 Table Class。
-        :param rconfig: ``RegionalConfig`` 的实例。
-        """
-        tables = self.__regional_table_cls.get(name)
-        if tables is None:
-            tables = {}
-            self.__regional_table_cls[name] = tables
-        for regional in rconfig.rlist:
-            r = regional.get('r')
-
-            # 避免重复建立表
-            if tables.get(r) is not None:
-                continue
-
-            # 默认使用键名 bind_key_db，若找不到则使用键名 bind_key。
-            bind_key = regional.get('bind_key_db')
-            Cls = build_table_method(f'{name}{r}', bind_key=bind_key)
-            tables[r] = Cls
-        # logger.info('build_regional_tables %s', tables)
-
-    def get_regional_table(
-        self, name: str, r: int, build_table_method, rconfig: RegionalConfig
-    ):
-        """根据 regionals 和表名称前缀获取一个动态创建的表。
-
-        :param name: 表的名称前缀。
-        :param r: regional。
-        :param rconfig: ``RegionalConfig`` 的实例。
-        """
-        if not r in rconfig.rids:
-            raise ValueError('get_regional_table: No regional %s' % r)
-        tables = self.__regional_table_cls.get(name)
-        Cls = None
-        if isinstance(tables, dict):
-            Cls = tables.get(r)
-        if Cls is None:
-            # 可能存在更新了 regional 之后，没有更新 tables 的情况，这里要更新一次。
-            # 每个进程都需要更新，但每次调用可能仅发生在其中一个进程。因此必须在每次调用的时候都检测更新。
-            self.build_regional_tables(name, build_table_method, self._gconf)
-            return self.__regional_table_cls.get(name)
-        # logger.info('get_regional_table %s', Cls)
-        return Cls
-
-    def result2dict(
-        self,
-        result: dict | RowMapping | Row,
-        keys: Sequence[str],
-        replaceobj: dict = None,
-        replaceobj_key_only: bool = False,
-    ) -> dict:
-        """根据提供的 keys、replaceobj、replaceobj_key_only 转换 result 为 dict。
-
-        :param result: 要转换的对象。
-        :param keys: 要转换对象的key list。
-        :param replaceobj: 可替换的键。
-        :param replaceobj_key_only: 仅包含可替换的键。
-        :return: 转换成功的 dict。
-        """
-        result_dict = {}
-        for key in keys:
-            value = (
-                result.get(key) if isinstance(result, dict) else getattr(result, key)
-            )
-            if isinstance(value, datetime):
-                value = value.isoformat()
-            elif isinstance(value, Decimal):
-                value = int(value)
-            newkey = key
-            if replaceobj:
-                # 仅使用 replaceobj 中提供的键名
-                # 这样在找不到键名的时候，newkey 的值为 None
-                if replaceobj_key_only:
-                    newkey = replaceobj.get(key, None)
-                # 找不到对应键名，就使用原始键名
-                else:
-                    newkey = replaceobj.get(key, key)
-            if newkey:
-                result_dict[newkey] = value
-        return result_dict
-
-    def to_response_data(
-        self,
-        result: list | dict | Result | Row,
-        replaceobj: dict = None,
-        replaceobj_key_only: bool = False,
-    ):
-        """把数据库查询出来的 ResultProxy 转换成标准的 dict 或者 list，
-        支持 Result/list[Row]/dict 类型，
-        dict 中的值不能包含嵌套的 ResultProxy 对象。
-
-        :param result: 要处理的对象，可以是 list[Row]/dict/Result/Row。
-        :param replaceobj: 替换键名。
-        :param replaceobj_key_only: 仅使用替换键名，丢掉非替换键名的键。
-        """
-        if result is None:
-            return {}
-        if isinstance(result, list):
-            return [
-                self.to_response_data(item, replaceobj, replaceobj_key_only)
-                for item in result
-            ]
-        elif isinstance(result, dict):
-            if replaceobj is None:
-                return result
-            return self.result2dict(
-                result, result.keys(), replaceobj, replaceobj_key_only
-            )
-        elif isinstance(result, Result):
-            if replaceobj is None:
-                return [item._asdict() for item in result.all()]
-            return [
-                self.result2dict(item, item._fields, replaceobj, replaceobj_key_only)
-                for item in result.all()
-            ]
-        elif isinstance(result, Row):
-            if replaceobj is None:
-                return result._asdict()
-            return self.result2dict(
-                result, result._fields, replaceobj, replaceobj_key_only
-            )
-        return result
+    FrameworkAppClass: Flask 的子类。
+    ResponseClass: Flask Response 的子类。
+    ConfigClass:  对 flask.config 进行包装。
+    error_handler: 是否启用 ``Flask.register_error_handler``
+    接管 HTTP STATUS_CODE 处理。若值为 True，则使用 ``pyape.errors`` 来接管。
+"""
 
 
-class PyapeRedis:
-    """基于 flask-redis 修改
-    增加 根据 Regional 获取 redis client 的封装
-    https://github.com/underyx/flask-redis
-    """
-
-    _gconf: GlobalConfig = None
-    _rconf: RegionalConfig = None
-
-    _client: Redis = None
-    """ 保存对应 REDIS_URI 的 redis client 对象。"""
-
-    _client_binds: dict = None
-    """ 保存对应 REDIS_BINDS 的 redis client 对象。"""
-
-    _uri: str = None
-    """ 配置文件中的 REDIS_URI 的值。"""
-
-    _uri_binds: dict = None
-    """ 配置文件中的 REDIS_BINDS 的值。"""
+class PyapeAppFlask(PyapeApp):
+    """Flask 的专用 App，管理 Flask 对象的初始化工作。"""
 
     def __init__(
         self,
-        app: PyapeFlask = None,
-        gconf: GlobalConfig = None,
-        config_prefix="REDIS",
-        **kwargs,
-    ):
-        if app is None and gconf is None:
-            raise ValueError('Either app or gconf must be present.')
-        self.provider_kwargs = kwargs
-        self.config_prefix = config_prefix
-
-        self.config_uri = f'{config_prefix}_URI'
-        self.config_binds = f'{config_prefix}_BINDS'
-
-        # 保存 REDIS_URI 中设定的那个连接
-        self._client: Redis = None
-        # 以 bind_key 保存 Client，其中 self._redis_client 将 None 作为 bind_key 保存
-        self._client_binds = None
-
-        if app is not None:
-            self._gconf = app._gconf
-            self._rconf = app._gconf.regional
-            self.init_app(app)
+        gconf: GlobalConfig,
+        create_arg: CreateArgument = None,
+        package_name: str = 'pyape.app',
+    ) -> None:
+        super().__init__(gconf, create_arg, package_name)
+        if self.create_arg is None:
+            self.create_arg = CreateArgument(_default_create_arg)
         else:
-            self._gconf = gconf
-            self._rconf = gconf.regional
-            self.init_redis()
+            merge_args = CreateArgument(_default_create_arg)
+            merge_args.update(self.create_arg)
+            self.create_arg = merge_args
 
-    def init_app(self, app: PyapeFlask, **kwargs):
-        """初始化 redis 连接，并将  REDIS 写入 Flask 的 extensions 对象。"""
-        self.init_redis(**kwargs)
+        flask.cli.load_dotenv()
 
-        if not hasattr(app, 'extensions'):
-            app.extensions = {}
-        app.extensions[self.config_prefix.lower()] = self
+        self.framework_app = self.create_app()
+        # 增加自定义 jinja filter
+        self.app.add_template_filter(jinja_filter_strftimestamp, 'strftimestamp')
+        self.init_db()
+        self.init_redis()
 
-    def init_redis(self, **kwargs):
-        """仅初始化 redis 连接。"""
-        self.provider_kwargs.update(kwargs)
-        self._uri = self._gconf.getcfg(
-            self.config_uri, default_value='redis://localhost:6379/0'
+        # cache 可能会使用 redis，因此顺序在 redis 初始化之后
+        self.init_cache()
+
+        # logger 可能会使用 redis，因此顺序在 redis 初始化之后
+        self.init_logger()
+
+        if self.create_arg and self.create_arg.init_app_method:
+            self.create_arg.init_app_method(self)
+
+        # blueprint 要 import gdb，因此要在 gdb 之后注册
+        appmodules = self.gconf.getcfg('PATH', 'modules')
+        self.register_blueprint('app', appmodules)
+
+    @property
+    def debug(self) -> bool:
+        return self.app.config.get('DEBUG')
+
+    @property
+    def app(self) -> FrameworkApp:
+        if flask.current_app:
+            # https://werkzeug.palletsprojects.com/en/2.0.x/local/#werkzeug.local.LocalProxy._get_current_object
+            # No application found. Either work inside a view function or push
+            # an application context. See
+            # http://flask-sqlalchemy.pocoo.org/contexts/.
+            return flask.current_app._get_current_object()
+        return super().app
+
+    def create_app(self) -> FrameworkApp:
+        FlaskClass = self.create_arg.FrameworkAppClass
+        ResponseClass = self.create_arg['ResponseClass']
+        ConfigClass = self.create_arg['ConfigClass']
+        error_handler = self.create_arg['error_handler']
+
+        flask_init_kwargs = self._build_kwargs_for_app()
+
+        pyape_app = FlaskClass(__name__, gconf=self.gconf, **flask_init_kwargs)
+        pyape_app.response_class = ResponseClass
+        pyape_app.config.from_object(ConfigClass(self.gconf.getcfg('FLASK')))
+        if pyape_app.config.get('COMPRESS_ON'):
+            # 压缩 gzip
+            compress = Compress()
+            compress.init_app(pyape_app)
+        # 处理全局错误
+        if error_handler:
+            errors.init_app(pyape_app)
+        return pyape_app
+
+    def register_blueprint(self, app_package_name: str, app_package_conf: dict) -> None:
+        """注册 Blueprint，必须在 gdb 的创建之后调用。
+
+        :param app_package_name: 父包名，在这个包下，放置实际提供服务的模块。
+        :param app_package_conf: {name:url, name2:url2}
+        """
+        if app_package_name is None:
+            return
+        for name, url in app_package_conf.items():
+            bp_module = importlib.import_module('.' + name, app_package_name)
+            # name 可能为 app.name 这样的复合包，这种情况下，Blueprint 实例的名称为 app_name
+            bp_name = name.replace('.', '_')
+            self.app.register_blueprint(getattr(bp_module, bp_name), url_prefix=url)
+
+    def _build_kwargs_for_app(self):
+        """将本地所有路径转换为绝对路径，以保证其在任何环境下可用。"""
+        kwargs = {
+            'static_url_path': self.gconf.getcfg(
+                'PATH', 'STATIC_URL_PATH', default_value=''
+            ),
+            'static_folder': self.gconf.getcfg(
+                'PATH', 'STATIC_FOLDER', default_value='static'
+            ),
+            'template_folder': self.gconf.getcfg(
+                'PATH', 'TEMPLATE_FOLDER', default_value='templates'
+            ),
+        }
+
+        instance_path = self.gconf.getcfg('PATH', 'INSTANCE_PATH')
+        if instance_path:
+            kwargs['instance_path'] = (
+                self.gconf.getdir(instance_path).resolve().as_posix()
+            )
+        else:
+            kwargs['instance_path'] = self.gconf.getdir().resolve().as_posix()
+
+        kwargs['template_folder'] = (
+            self.gconf.getdir(kwargs['template_folder']).resolve().as_posix()
         )
-        self._client = Redis.from_url(self._uri, **self.provider_kwargs)
-        self._update_binds()
+        kwargs['static_folder'] = (
+            self.gconf.getdir(kwargs['static_folder']).resolve().as_posix()
+        )
+        return kwargs
 
-    def _update_binds(self):
-        self._uri_binds = self._gconf.getcfg(self.config_binds)
-        self._client_binds = {None: self._client}
-        if isinstance(self._uri_binds, dict):
-            for bind_key, bind_uri in self._uri_binds.items():
-                self._client_binds[bind_key] = Redis.from_url(
-                    bind_uri, **self.provider_kwargs
-                )
-
-    def get_uri(self, bind_key: str = None, miss_default: bool = False) -> str:
-        """获取一个 redis uri 地址。
-
-        :param bind_key: 绑定的值，可以为 None
-        :param miss_default: 若找不到 bind_key 中的对应 uri，就使用默认的 self._uri。
-        """
-        return self._uri_binds.get(bind_key, self._uri if miss_default else None)
-
-    def get_client(self, bind_key: str = None, miss_default: bool = False) -> Redis:
-        """获取一个 redis client。
-
-        :param bind_key: 绑定的值，可以为 None
-        :param miss_default: 若找不到 bind_key 中的对应 client，就使用默认的 self._client。
-        """
-        return self._client_binds.get(bind_key, self._client if miss_default else None)
-
-    def get_clients(self) -> dict[str, Redis]:
-        return self._client_binds
-
-    def get_regional_client(self, r: int, force: bool = True) -> Redis:
-        """根据 r 获取到一个 py_redis_client
-
-        :param r: regional
-        :param force: 没有 redis 配置会抛出 ValueError 异常。若设置为 False 则返回 None（无异常）
-        """
-        if not r in self._rconf.rids:
-            if force:
-                raise ValueError('get_redis_client: no regional %s' % r)
-            return None
-        robj = self._rconf.rdict.get(r)
-        # bind_key_redis 如果没有定义，或者为 None，就会得到默认的 REDIS_URI
-        return self.get_client(robj.get('bind_key_redis'))
-
-    def get_regional_clients(self):
-        """获取到一个以 regional 为键名的 py_redis_client dict"""
-        clients = {}
-        rc_clients = self.get_clients()
-        for r, robj in self._rconf.rdict.items():
-            # bind_key_redis 如果没有定义，或者为 None，就会得到默认的 REDIS_URI
-            bind_key_redis = robj.get('bind_key_redis')
-            clients[r] = rc_clients[bind_key_redis]
-        return clients
-
-
-def flash_dict(d, category: str = 'message'):
-    """将 dict 中的每一项转换为一行进行 flash 输出"""
-    s = []
-    for k, v in d.items():
-        s.append(f'{k}: {", ".join(v)}')
-    flask.flash(' '.join(s), category)
-
-
-def jinja_filter_strftimestamp(ts, fmt: str = None):
-    """将 timestamp 转换成为字符串。"""
-    # fmt = '%Y-%m-%d'
-    dt = datetime.fromtimestamp(ts)
-    if fmt is None:
-        return dt.isoformat()
-    return dt.strftime(fmt)
+    def get_loggers(self) -> list[logging.Logger]:
+        flasklogger = self.app.logger
+        # 删除 Flask 的默认 Handler
+        del flasklogger.handlers[:]
+        return [flasklogger]

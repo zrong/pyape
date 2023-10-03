@@ -10,7 +10,7 @@ pyape.db
 import math
 from threading import Lock
 
-from typing import Iterable, Union
+from collections.abc import Iterable
 from sqlalchemy.schema import Table, MetaData
 from sqlalchemy.orm import (
     DeclarativeMeta,
@@ -178,7 +178,7 @@ class DefaultMeta(BindMetaMixin, DeclarativeMeta):
     pass
 
 
-class DBManager(object):
+class DBManager:
     """ 管理 SQL 连接，创建和管理数据库 Engine，Session，Model。
     
     :param URI: 提供数据库地址。
@@ -188,7 +188,7 @@ class DBManager(object):
     default_bind_key: str = None
     """ 默认的 bind_key 必须存在，它的默认值就是 ``None``，这是一个有效的 bind_key。"""
 
-    URI: Union[dict, str] = None
+    URI: dict | str = None
     """ 从配置文件中解析出的 URI 值，可能是 str 或者 dict。"""
 
     ENGINE_OPTIONS: dict = None
@@ -206,7 +206,7 @@ class DBManager(object):
     __model_classes: dict = None
 
     def __init__(
-        self, URI: Union[dict, str], ENGINE_OPTIONS: dict = None, **kwargs: dict
+        self, URI: dict | str, ENGINE_OPTIONS: dict = None, **kwargs: dict
     ) -> None:
         self.__engines = {}
         self.__binds = {}
@@ -397,7 +397,7 @@ class DBManager(object):
         return scoped_session(self.Session_Factory)
 
 
-class SQLAlchemy(object):
+class SQLAlchemy:
     """ 创建一个用 sqlalchemy 管理数据库的对象。
     封装常用的高级功能，例如 table 和 query 操作。
 
@@ -412,13 +412,13 @@ class SQLAlchemy(object):
     is_scoped: bool = True
     in_flask: bool = True
 
-    Session: Union[sessionmaker, scoped_session] = None
+    Session: sessionmaker | scoped_session = None
     """ 根据 is_scoped 的值，保存 sessionmaker 或者 scoped_session 的结果对象。"""
 
     def __init__(
         self,
         dbm: DBManager = None,
-        URI: Union[dict, str] = None,
+        URI: dict | str = None,
         ENGINE_OPTIONS: dict = None,
         is_scoped: bool = True,
         in_flask: bool = False,

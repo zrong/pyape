@@ -8,7 +8,7 @@ from functools import wraps
 
 from flask import request, abort
 
-from pyape.app import logger, gconfig
+from pyape.app import logger, gconf
 from pyape.app.re2fun import get_request_values
 from pyape.util.func import parse_int
 
@@ -73,11 +73,11 @@ def regional_gconfig(add_r=False, ignore_zero=False):
     def decorator(f):
         @wraps(f)
         def decorated_fun(*args, **kwargs):
-            if gconfig.regional is None:
+            if gconf.regional is None:
                 logger.error('@regional_checker_gconfig NO RegionalConfig')
                 abort(403)
             r = request.args.get('r')
-            r, robj = gconfig.regional.check_regional(r, ignore_zero)
+            r, robj = gconf.regional.check_regional(r, ignore_zero)
             if r is None:
                 logger.regional('@regional_checker_gconfig CAN NOT find regional {}.'.format(r))
                 abort(403)
@@ -126,11 +126,11 @@ def ip_gconfig():
     def decorator(f):
         @wraps(f)
         def decorated_fun(*args, **kwargs):
-            if gconfig.regional is None:
+            if gconf.regional is None:
                 logger.error('@ip_checker_gconfig NO RegionalConfig')
                 abort(403)
             r = request.args.get('r')
-            r, robj = gconfig.regional.check_regional(r, False)
+            r, robj = gconf.regional.check_regional(r, False)
             if r is None:
                 logger.error('@ip_checker_gconfig CAN NOT find regional %s.', r)
                 abort(403)

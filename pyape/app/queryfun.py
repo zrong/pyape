@@ -4,11 +4,7 @@ pyape.app.queryfun
 
 查询常用方法封装
 """
-from flask import jsonify
 from sqlalchemy import func
-from sqlalchemy.orm import Session
-
-from pyape.app import logger
 
 
 def sql_from_unixtime(dtfield, dtformat='%Y-%m-%d'):

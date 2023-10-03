@@ -21,15 +21,30 @@ class ErrorCode(IntEnum):
     REPLACE_KEY_ERROR = auto()
     """ 配置替换时发生 KeyError。"""
 
+    APP_NOT_FOUND = auto()
+    """ 在 PyapeApp 实例中没有找到对应的框架 app 设置。"""
 
-class ConfigError(Exception):
+    DUP_DEF = auto()
+    """ 核心库（gdb, gconf）重复定义。"""
+
+
+class PyapeError(Exception):
     code: ErrorCode = ErrorCode.DEFAULT
-    """ 配置文件中使用的错误代码。"""
+    """ 错误代码。"""
 
     message: str = None
-    """ 配置文件出错消息。"""
+    """ 错误消息。"""
 
     def __init__(self, message: str, code: ErrorCode=ErrorCode.DEFAULT, *args: object) -> None:
         super().__init__(*args)
         self.code = code
         self.message = message
+
+class AppError(PyapeError):
+    """ App 核心错误消息。"""
+    pass
+
+
+class ConfigError(PyapeError):
+    """ 配置文件错误消息。"""
+    pass
