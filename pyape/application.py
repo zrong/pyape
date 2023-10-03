@@ -36,12 +36,13 @@ FrameworkRouter = TypeVar('FrameworkRouter')
 
 
 class CreateArgument(Dicto):
-    """保存创建框架 app 时使用的附加 class。"""
+    """保存创建框架 app 时使用的附加参数。"""
 
-    FrameworkAppClass: type = None
+    # 框架 App 的类，Flask/FastAPI 或其子类。
+    # FrameworkAppClass: type = None
 
-    init_app_method: Callable = None
-    """ 外部初始化方法，若提供，在初始化后调用。"""
+    # 外部初始化方法，若提供，在初始化后调用。
+    # init_app_method: Callable = None
 
 
 class PyapeApp:

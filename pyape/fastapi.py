@@ -4,6 +4,7 @@ pyape.fastapi
 
 对 Fastapi 框架进行扩展。
 """
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, APIRouter
@@ -33,6 +34,8 @@ class PyapeAppFastAPI(PyapeApp):
             merge_args.update(self.create_arg)
             self.create_arg = merge_args
 
+        print(f'{self.create_arg=}')
+
         self.framework_app = self.create_app()
 
         self.init_db()
@@ -46,8 +49,13 @@ class PyapeAppFastAPI(PyapeApp):
         # Router 要 import gdb，因此要在 gdb 之后注册
         self.register_routers()
 
+    @property
+    def debug(self) -> bool:
+        return self.app.debug
+
     def create_app(self) -> FastAPI:
         FastAPIClass = self.create_arg.FrameworkAppClass
+        print(f'create_app {self.create_arg=}')
         app: FastAPI = FastAPIClass()
 
         # 挂载静态文件，设置默认名称
@@ -68,3 +76,8 @@ class PyapeAppFastAPI(PyapeApp):
     def register_a_router(self, router_obj: APIRouter, url_prefix: str):
         app: FastAPI = self.app
         app.include_router(router_obj, prefix=url_prefix)
+
+    def get_loggers(self) -> list[logging.Logger]:
+        from fastapi.logger import logger
+        # del logger.handlers[:]
+        return [logger]

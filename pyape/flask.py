@@ -252,7 +252,7 @@ class PyapeAppFlask(PyapeApp):
 
     @property
     def debug(self) -> bool:
-        return self.app.config.get('DEBUG')
+        return self.app.debug
 
     @property
     def app(self) -> PyapeFlask:
