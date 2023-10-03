@@ -3,7 +3,7 @@ from functools import partial
 
 import pyape.app
 import pyape.config
-from pyape.flask.extend import PyapeFlask, PyapeResponse, PyapeAppFlask
+from pyape.flask import PyapeFlask, PyapeResponse, PyapeAppFlask
 from pyape.application import CreateArgument
 
 # 工作文件夹
@@ -52,7 +52,7 @@ def create_app(gapp: PyapeAppFlask):
 
 gapp = PyapeAppFlask(
     gconfig,
-    CreateArgument(ResponseClass=CustomResponse, init_app_method=setup_app),
+    CreateArgument(ResponseClass=CustomResponse, init_app_method=create_app),
     pyape.app.__name__,
 )
 

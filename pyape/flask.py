@@ -1,5 +1,5 @@
 """
-pyape.flask.extend
+pyape.flask
 ----------------------
 
 对 Flask 框架进行扩展。
@@ -11,13 +11,12 @@ import importlib
 import flask
 import flask.cli
 from flask_compress import Compress
-from flask import Flask, Response, request
+from flask import Flask, Response, request, Blueprint, jsonify, flash
 from flask.sessions import SecureCookieSessionInterface
 from werkzeug.datastructures import Headers
 
 from pyape.config import GlobalConfig, Dicto
-from pyape.flask import errors
-from pyape.application import CreateArgument, PyapeApp, PyapeDB, FrameworkApp
+from pyape.application import CreateArgument, PyapeApp, PyapeDB
 from pyape.db import DBManager, SQLAlchemy
 
 
@@ -26,7 +25,7 @@ def flash_dict(d, category: str = 'message'):
     s = []
     for k, v in d.items():
         s.append(f'{k}: {", ".join(v)}')
-    flask.flash(' '.join(s), category)
+    flash(' '.join(s), category)
 
 
 def jinja_filter_strftimestamp(ts, fmt: str = None):
@@ -36,6 +35,30 @@ def jinja_filter_strftimestamp(ts, fmt: str = None):
     if fmt is None:
         return dt.isoformat()
     return dt.strftime(fmt)
+
+
+def forbidden(e):
+    response = jsonify({'error': True, 'code': 403, 'message': '403 forbidden'})
+    response.status_code = 403
+    return response
+
+
+def page_not_found(e):
+    response = jsonify({'error': True, 'code': 404, 'message': '404 not found'})
+    response.status_code = 404
+    return response
+
+
+def method_not_allowed(e):
+    response = jsonify({'error': True, 'code': 405, 'message': '405 method not allowed'})
+    response.status_code = 405
+    return response
+
+
+def internal_server_error(e):
+    response = jsonify({'error': True, 'code': 500, 'message': '500 internal server error'})
+    response.status_code = 500
+    return response
 
 
 class PyapeSecureCookieSessionInterface(SecureCookieSessionInterface):
@@ -225,15 +248,14 @@ class PyapeAppFlask(PyapeApp):
             self.create_arg.init_app_method(self)
 
         # blueprint 要 import gdb，因此要在 gdb 之后注册
-        appmodules = self.gconf.getcfg('PATH', 'modules')
-        self.register_blueprint('app', appmodules)
+        self.register_routers()
 
     @property
     def debug(self) -> bool:
         return self.app.config.get('DEBUG')
 
     @property
-    def app(self) -> FrameworkApp:
+    def app(self) -> PyapeFlask:
         if flask.current_app:
             # https://werkzeug.palletsprojects.com/en/2.0.x/local/#werkzeug.local.LocalProxy._get_current_object
             # No application found. Either work inside a view function or push
@@ -242,7 +264,7 @@ class PyapeAppFlask(PyapeApp):
             return flask.current_app._get_current_object()
         return super().app
 
-    def create_app(self) -> FrameworkApp:
+    def create_app(self) -> PyapeFlask:
         FlaskClass = self.create_arg.FrameworkAppClass
         ResponseClass = self.create_arg['ResponseClass']
         ConfigClass = self.create_arg['ConfigClass']
@@ -250,31 +272,30 @@ class PyapeAppFlask(PyapeApp):
 
         flask_init_kwargs = self._build_kwargs_for_app()
 
-        pyape_app = FlaskClass(__name__, gconf=self.gconf, **flask_init_kwargs)
-        pyape_app.response_class = ResponseClass
-        pyape_app.config.from_object(ConfigClass(self.gconf.getcfg('FLASK')))
-        if pyape_app.config.get('COMPRESS_ON'):
+        flask_app = FlaskClass(__name__, gconf=self.gconf, **flask_init_kwargs)
+        flask_app.response_class = ResponseClass
+        flask_app.config.from_object(ConfigClass(self.gconf.getcfg('FLASK')))
+        if flask_app.config.get('COMPRESS_ON'):
             # 压缩 gzip
             compress = Compress()
-            compress.init_app(pyape_app)
+            compress.init_app(flask_app)
         # 处理全局错误
         if error_handler:
-            errors.init_app(pyape_app)
-        return pyape_app
+            self.register_error_handler(flask_app)
+        return flask_app
 
-    def register_blueprint(self, app_package_name: str, app_package_conf: dict) -> None:
-        """注册 Blueprint，必须在 gdb 的创建之后调用。
+    def register_error_handler(self, flask_app: PyapeFlask):
+        flask_app.register_error_handler(403, forbidden)
+        flask_app.register_error_handler(404, page_not_found)
+        flask_app.register_error_handler(405, method_not_allowed)
+        flask_app.register_error_handler(500, internal_server_error)
+        # flask_app.error_handler_spec[None][403] = forbidden
+        # flask_app.error_handler_spec[None][404] = page_not_found
+        # flask_app.error_handler_spec[None][405] = method_not_allowed
+        # flask_app.error_handler_spec[None][500] = internal_server_error
 
-        :param app_package_name: 父包名，在这个包下，放置实际提供服务的模块。
-        :param app_package_conf: {name:url, name2:url2}
-        """
-        if app_package_name is None:
-            return
-        for name, url in app_package_conf.items():
-            bp_module = importlib.import_module('.' + name, app_package_name)
-            # name 可能为 app.name 这样的复合包，这种情况下，Blueprint 实例的名称为 app_name
-            bp_name = name.replace('.', '_')
-            self.app.register_blueprint(getattr(bp_module, bp_name), url_prefix=url)
+    def register_a_router(self, router_obj: Blueprint, url_prefix: str):
+        self.app.register_blueprint(router_obj, url_prefix=url_prefix)
 
     def _build_kwargs_for_app(self):
         """将本地所有路径转换为绝对路径，以保证其在任何环境下可用。"""

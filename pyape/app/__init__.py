@@ -2,7 +2,7 @@
 pyape.app
 ----------------------
 
-处理 app 初始化，与 flask 强相关
+app 初始化。
 """
 
 import logging

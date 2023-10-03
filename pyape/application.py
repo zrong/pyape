@@ -5,7 +5,8 @@ pyape.application
 pyape 框架的核心应用程序。
 """
 import sys
-from typing import TypeVar, Self
+import importlib
+from typing import TypeVar, Self, Final
 from types import ModuleType
 from collections.abc import Callable, Sequence
 from decimal import Decimal
@@ -27,6 +28,9 @@ from pyape.logging import get_logging_handler, get_pyzog_handler
 FrameworkApp = TypeVar('FrameworkApp')
 """ 绑定 Flask 或者 FastApi 类型。"""
 
+FrameworkRouter = TypeVar('FrameworkRouter')
+""" 绑定 flask.Blueprint 或者 fastapi.APIRouter """
+
 # PDB = TypeVar('PDB', bound='PyapeDB')
 # PRedis = TypeVar('PRedis', bound='PyapeRedis')
 
@@ -42,6 +46,9 @@ class CreateArgument(Dicto):
 
 class PyapeApp:
     """Pyape 支持 Flask 和 FastApi，需要一个抽象类作为中间态。"""
+
+    PROJECT_PACKAGE_NAME: Final[str] = 'app'
+    """ 位于项目中的提供路由功能的包名。必须为 app。"""
 
     package_name: str = None
     """ pyape 的包名。一般为 pyape.app.__name__ 的值。"""
@@ -223,6 +230,20 @@ class PyapeApp:
         self.set_package_global(global_name, __loggers[0])
         self.logger = __loggers[0]
         return self.logger
+
+    def register_a_router(self, router_obj: FrameworkRouter, url_prefix: str):
+        raise NotImplementedError(f'{self.__class__.__name__}.register_a_router')
+
+    def register_routers(self):
+        """注册路由，必须在 gdb 的创建之后调用。
+        """
+        appmodules = self.gconf.getcfg('PATH', 'modules')
+        for name, url in appmodules.items():
+            router_module = importlib.import_module('.' + name, self.PROJECT_PACKAGE_NAME)
+            # name 可能为 app.name 这样的复合包，这种情况下，路由实例的名称必须设置为 app_name。
+            router_name = name.replace('.', '_')
+            router_obj = getattr(router_module, router_name)
+            self.register_a_router(router_obj, url)
 
 
 class PyapeDB(SQLAlchemy):
