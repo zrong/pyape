@@ -1,5 +1,5 @@
 """
-pyape.app.vofun
+pyape.app.flask.volueobject
 ~~~~~~~~~~~~~~~~~~~
 
 对 ValueObject 的操作封装
@@ -14,8 +14,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from pyape.util.func import parse_int
 from pyape.app import gdb, gcache, logger
-from pyape.app.models.valueobject import ValueObject, get_vo_query
-from pyape.app.re2fun import responseto, get_page_response
+
+from ..models.valueobject import ValueObject, get_vo_query
+from .re2 import responseto, get_page_response
 
 
 # @checker.request_checker('votype', 'status', 'merge', defaultvalue={'merge': 1, 'status': 1}, request_key='args', parse_int_params=['merge', 'status', 'votype'])

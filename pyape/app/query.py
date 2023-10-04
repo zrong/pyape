@@ -1,5 +1,5 @@
 """
-pyape.app.queryfun
+pyape.app.query
 ------------------------
 
 查询常用方法封装

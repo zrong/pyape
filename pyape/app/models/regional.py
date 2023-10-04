@@ -5,7 +5,7 @@ pyape.app.models.regional
 与 regional 表相关的方法
 """
 import time
-import tomli as tomllib
+import tomllib
 from sqlalchemy.orm import Query, Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import Enum, SMALLINT, VARCHAR, INTEGER, FLOAT, TEXT, TIMESTAMP

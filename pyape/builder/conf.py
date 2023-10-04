@@ -12,9 +12,9 @@ from typing import Any, Optional
 
 import tomllib
 import tomli_w
-from pyape.tpl import base_dir as pyape_tpl_dir
 from pyape.error import ConfigError, ErrorCode
 from pyape.config import merge_dict
+from .tpl import base_dir as pyape_tpl_dir
 
 
 class ConfigWriter(object):

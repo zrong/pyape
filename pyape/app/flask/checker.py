@@ -1,5 +1,5 @@
 """
-pyape.app.checker
+pyape.app.flask.checker
 -----------------------
 
 装饰器集合
@@ -9,10 +9,10 @@ from functools import wraps
 from flask import request, abort
 
 from pyape.app import logger, gconf
-from pyape.app.re2fun import get_request_values
 from pyape.util.func import parse_int
 
-from pyape.app.models.regional import check_regional
+from .re2 import get_request_values
+from ..models.regional import check_regional
 
 
 def page():

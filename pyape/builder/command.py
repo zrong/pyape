@@ -14,8 +14,8 @@ from rich.console import Console
 
 from invoke.exceptions import Exit
 
-from pyape.tpl import base_dir as pyape_tpl_dir
-from pyape.builder import (
+from .tpl import base_dir as pyape_tpl_dir
+from . import (
     get_pyape_toml,
     get_pyape_toml_file,
     MainConfigFile,

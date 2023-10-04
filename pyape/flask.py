@@ -6,7 +6,6 @@ pyape.flask
 """
 from datetime import datetime
 import logging
-import importlib
 
 import flask
 import flask.cli

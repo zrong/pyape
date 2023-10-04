@@ -13,8 +13,8 @@ import tomli_w
 
 from sqlalchemy.sql.expression import or_
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.types import Enum, SMALLINT, VARCHAR, INTEGER, FLOAT, TEXT, TIMESTAMP
-from sqlalchemy import  Column, ForeignKey
+from sqlalchemy.types import SMALLINT, VARCHAR, INTEGER, FLOAT, TEXT, TIMESTAMP
+from sqlalchemy import  Column
 
 from pyape.app import gdb, logger
 

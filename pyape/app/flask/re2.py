@@ -1,5 +1,5 @@
 """
-pyape.app.re2fun
+pyape.app.flask.re2
 ----------------------------
 
 请求和响应的常用方法封装

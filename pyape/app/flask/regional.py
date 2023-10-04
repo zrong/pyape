@@ -1,5 +1,5 @@
 """
-pyape.app.rfun
+pyape.app.flask.regional
 ~~~~~~~~~~~~~~~~~~~
 
 对 Regional 的操作封装
@@ -7,18 +7,18 @@ pyape.app.rfun
 
 import time
 
-import tomli as tomllib
+import tomllib
 from flask import jsonify
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.expression import or_
 from sqlalchemy.orm import Session
 
-from pyape.app.re2fun import responseto, get_page_response
 from pyape.app import gdb, logger
 from pyape.util.func import parse_int
 
-from pyape.app.models.regional import get_regional_qry
+from ..models.regional import get_regional_qry
+from .re2 import responseto, get_page_response
 
 
 def regional_get_more(regional_cls, page, per_page, kindtype, status, merge):

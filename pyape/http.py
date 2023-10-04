@@ -1,3 +1,9 @@
+"""
+pyape.http
+----------------------
+
+封装 httpx，自动处理响应。
+"""
 import json
 from typing import Any, Callable
 import httpx
