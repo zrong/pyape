@@ -145,11 +145,11 @@ stats = '%d%nstats.sock'
 ['config.toml']
 # 用于信任的 MJST TOKEN，处于这个列表中的 MJST 不会因为过期被拒绝。
 TRUSTED_TOKENS = []
+# 用于内部加密，Flask 和 Fastapi 均使用这个值
+SECRET_KEY = '{{SECRET_KEY}}'
 
 # flask 框架的配置
 ['config.toml'.FLASK]
-# 用于 FLASK 内部加密
-SECRET_KEY = '{{SECRET_KEY}}'
 
 ['config.toml'.SQLALCHEMY]
 # 单数据库地址配置， {{WORK_DIR}} 被替换为 pyape 运行文件夹的绝对路径
@@ -186,6 +186,11 @@ pool_recycle = 3600
 # db0 = 'redis://localhost:6379/0'
 # db1 = 'redis://localhost:6379/1'
 
+# 设置默认的 WEBHOOK 值，用于 pyape.util.warning
+# ['config.toml'.WEBHOOK.DEFAULT]
+# APP_NAME = 'FEISHU'
+# BOT_NAME = 'OPT'
+# IS_ASYNC = false
 
 # 配置系统使用的根帐号和密码
 # ['config.toml'.ADMIN]

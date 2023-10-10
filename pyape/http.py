@@ -5,7 +5,8 @@ pyape.http
 封装 httpx，自动处理响应。
 """
 import json
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 import httpx
 import asyncio
 

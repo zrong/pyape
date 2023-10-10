@@ -14,9 +14,10 @@ from flask import Flask, Response, request, Blueprint, jsonify, flash
 from flask.sessions import SecureCookieSessionInterface
 from werkzeug.datastructures import Headers
 
-from pyape.config import GlobalConfig, Dicto
-from pyape.application import CreateArgument, PyapeApp, PyapeDB
-from pyape.db import DBManager, SQLAlchemy
+from .config import GlobalConfig, Dicto
+from .error import ErrorCode, ConfigError
+from .application import CreateArgument, PyapeApp, PyapeDB
+from .db import DBManager, SQLAlchemy
 
 
 def flash_dict(d, category: str = 'message'):
@@ -263,6 +264,16 @@ class PyapeAppFlask(PyapeApp):
             return flask.current_app._get_current_object()
         return super().app
 
+    def _get_flask_config(self) -> dict:
+        """ 更新 Flask 的配置文件。"""
+        flask_config_dict = self.gconf.getcfg('FLASK', default_value={})
+        secret_key_in_flask = flask_config_dict.get('SECRET_KEY')
+        if secret_key_in_flask is None:
+            flask_config_dict['SECRET_KEY'] = self.gconf.getcfg('SECRET_KEY')
+        if not flask_config_dict.get('SECRETE_KEY'):
+            raise ConfigError('SECRET_KEY or FLASK.SECRET_KEY is not in config.toml!', ErrorCode.REQUIRED_CONF)
+        return flask_config_dict
+
     def create_app(self) -> PyapeFlask:
         FlaskClass = self.create_arg.FrameworkAppClass
         ResponseClass = self.create_arg['ResponseClass']
@@ -273,7 +284,8 @@ class PyapeAppFlask(PyapeApp):
 
         flask_app = FlaskClass(__name__, gconf=self.gconf, **flask_init_kwargs)
         flask_app.response_class = ResponseClass
-        flask_app.config.from_object(ConfigClass(self.gconf.getcfg('FLASK')))
+        flask_config_dict = self.gconf.getcfg('FLASK')
+        flask_app.config.from_object(ConfigClass(self._get_flask_config()))
         if flask_app.config.get('COMPRESS_ON'):
             # 压缩 gzip
             compress = Compress()

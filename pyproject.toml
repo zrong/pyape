@@ -33,6 +33,7 @@ dependencies = [
     "python-json-logger",
     "httpx",
     "pyzmq",
+    "itsdangerous",
     "typer[all]",
 ]
 

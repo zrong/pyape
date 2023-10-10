@@ -12,6 +12,9 @@ class ErrorCode(IntEnum):
     DEFAULT = auto()
     """ 默认错误。"""
 
+    REQUIRED_CONF = auto()
+    """ 缺少必须的配置。"""
+
     ENV_NAME = auto()
     """ 没有提供正确的 env。"""
 
@@ -20,6 +23,9 @@ class ErrorCode(IntEnum):
 
     REPLACE_KEY_ERROR = auto()
     """ 配置替换时发生 KeyError。"""
+
+    WEBHOOK = auto()
+    """ webhook 配置错误。"""
 
     APP_NOT_FOUND = auto()
     """ 在 PyapeApp 实例中没有找到对应的框架 app 设置。"""
@@ -48,3 +54,5 @@ class AppError(PyapeError):
 class ConfigError(PyapeError):
     """ 配置文件错误消息。"""
     pass
+
+

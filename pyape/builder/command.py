@@ -174,7 +174,7 @@ main.add_typer(sub_server)
 # ---------------------------- 根命令
 @main.callback()
 def main_callback(
-    env: Annotated[str, typer.Option(help='支持的环境名称。')] = None,
+    env: Annotated[str, typer.Option('--env', '-e', help='支持的环境名称。')] = None,
     cwd: Annotated[
         Path, typer.Option(file_okay=False, exists=True, help='本地工作文件夹。')
     ] = Path.cwd(),
@@ -266,7 +266,7 @@ def uwsgi_top(
 
 @sub_conf.callback()
 def conf_main_callback(
-    force: Annotated[bool, typer.Option(help='覆盖已存在的文件。')] = False,
+    force: Annotated[bool, typer.Option('--force', '-f', help='覆盖已存在的文件。')] = False,
 ):
     global_state.force = force
 

@@ -20,7 +20,7 @@ def gen_nonce(k=8, chars=string.ascii_letters + string.digits):
     return ''.join(random.choices(chars, k=k))
 
 
-def gen_password(password, salt):
+def gen_password(password: str, salt: str):
     """
     计算密码散列后的值
     :param password:

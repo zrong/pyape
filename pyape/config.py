@@ -16,17 +16,9 @@ from typing import Any
 import tomllib
 import tomli_w
 
-from pyape.util.encrypt import Encrypt
-from pyape.util.func import parse_int
-
-
-# 根据平台中的配置字符串，确定属于哪个平台
-PlATFORMS = {
-    'BAIDU_SMARTPROGRAM': 'baidu',
-    'BYTEDANCE_MICROAPP': 'bytedance',
-    'WECHAT_MINIAPP': 'wechat',
-    'QQ_MINIGAME': 'qq2',
-}
+from .util.encrypt import Encrypt
+from .util.func import parse_int
+from .error import ConfigError, ErrorCode
 
 
 def merge_dict(x: dict, y: dict, z: dict = None) -> dict:
@@ -173,22 +165,6 @@ class RegionalConfig:
             return regional.get(key)
         return regional
 
-    def get_platform_conf(self, r: int):
-        """根据 regional 中的配置，获取平台的类型和配置
-        在返回的数据中包含 pfvalue/pfkey
-        若获取不到则返回 None
-        """
-        robj = self.get_regional(r)
-        for key in PlATFORMS.keys():
-            conf = robj.get(key)
-            if conf is not None:
-                pfconf = {}
-                pfconf.update(conf)
-                pfconf['pfkey'] = key
-                pfconf['pfvalue'] = PlATFORMS[key]
-                return pfconf
-        return None
-
 
 class GlobalConfig:
     """全局配置文件，对应 config.toml"""
@@ -307,8 +283,12 @@ class GlobalConfig:
         """获取配置文件中保存的数据库配置。
         提供解析数据库路径的功能，方便直接使用 pymysql 的方法调用数据库。
         """
-        dbbinds = self.getcfg('FLASK', 'SQLALCHEMY_BINDS')
-        dburi = self.getcfg('FLASK', 'SQLALCHEMY_DATABASE_URI')
+        uris = self.getcfg('SQLALCHEMY', 'URI')
+        dbbinds: dict = None
+        if isinstance(uris, str):
+            dbbinds = {None: uris}
+        elif isinstance(uris, dict):
+            dbbinds = uris
         uri = None
         if r is not None:
             r, regional = self.regional.check_regional(r)
@@ -317,8 +297,6 @@ class GlobalConfig:
         elif bind_key is not None:
             if dbbinds:
                 uri = dbbinds.get(bind_key)
-        elif bind_key is None:
-            uri = dburi
         if uri is None:
             return None
         dbre = re.compile(
@@ -339,6 +317,16 @@ class GlobalConfig:
             'database': m.group('database'),
         }
 
+    def _build_encrypter(self) -> None:
+        if self.encrypter is None:
+            secret_key = self.getcfg('SECRET_KEY')
+            if not secret_key:
+                raise ConfigError(
+                    'SECRET_KEY is not in config.toml!',
+                    ErrorCode.REQUIRED_CONF,
+                )
+            self.encrypter = Encrypt(secret_key)
+
     def encode_token(self, expire: int = 86400, ts: int = None, **kwargs: dict) -> str:
         """使用 Fernet 算法加密一组值为 token 用于鉴权。
 
@@ -348,11 +336,11 @@ class GlobalConfig:
         >>> encode_token(r=0, uid=1, nickname='超级管理员', usertype=50)
         'b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c'
         """
+        self._build_encrypter()
         if ts is None:
             ts = int(time.time()) + expire
-        if self.encrypter is None:
-            self.encrypter = Encrypt(self.getcfg('FLASK', 'SECRET_KEY'))
         kwargs['ts'] = ts
+        kwargs['expire_at'] = ts
         return self.encrypter.encrypt(json.dumps(kwargs))
 
     def decode_token(self, token: str) -> Dicto:
@@ -363,8 +351,7 @@ class GlobalConfig:
         >>> decode_token('b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c')
         {'r': 0, 'uid': 0, 'usertype': 50, 'status': 1, 'expires': False}
         """
-        if self.encrypter is None:
-            self.encrypter = Encrypt(self.getcfg('FLASK', 'SECRET_KEY'))
+        self._build_encrypter()
         tokenobj = json.loads(self.encrypter.decrypt(token))
         # 指示是否过期
         now = int(time.time())
