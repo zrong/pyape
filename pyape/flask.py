@@ -4,7 +4,6 @@ pyape.flask
 
 对 Flask 框架进行扩展。
 """
-from datetime import datetime
 import logging
 
 import flask
@@ -18,6 +17,7 @@ from .config import GlobalConfig, Dicto
 from .error import ErrorCode, ConfigError
 from .application import CreateArgument, PyapeApp, PyapeDB
 from .db import DBManager, SQLAlchemy
+from .util.date import jinja_filter_strftimestamp
 
 
 def flash_dict(d, category: str = 'message'):
@@ -26,15 +26,6 @@ def flash_dict(d, category: str = 'message'):
     for k, v in d.items():
         s.append(f'{k}: {", ".join(v)}')
     flash(' '.join(s), category)
-
-
-def jinja_filter_strftimestamp(ts, fmt: str = None):
-    """将 timestamp 转换成为字符串。"""
-    # fmt = '%Y-%m-%d'
-    dt = datetime.fromtimestamp(ts)
-    if fmt is None:
-        return dt.isoformat()
-    return dt.strftime(fmt)
 
 
 def forbidden(e):

@@ -38,12 +38,13 @@ class ZeroMQHandler(Handler):
 
     These are equivalent.
     """
+
     socket = None
     ctx = None
     socket_type = None
-    
+
     def __init__(self, interface_or_socket, context=None, socket_type=zmq.DEALER):
-        """ 创建 ZeroMQ context 和 socket
+        """创建 ZeroMQ context 和 socket
         :param interface_or_socket: 提供一个 socket 或者协议字符串
         :param context: 提供 ZeroMQ 的上下文
         :param socket_type: 提供 ZeroMQ 模式
@@ -71,14 +72,14 @@ class ZeroMQHandler(Handler):
 
 
 class RedisHandler(Handler):
-    """基于 Redis 的 publish 命令来发布 log
-    """
+    """基于 Redis 的 publish 命令来发布 log"""
+
     # redis 实例
     r = None
 
     # publish 频道
     channel = None
-    
+
     def __init__(self, url, channel, **kwargs):
         Handler.__init__(self)
         self.channel = channel
@@ -91,7 +92,7 @@ class RedisHandler(Handler):
 
 
 def _create_file_handler(target, filename, chmod=False):
-    """ 创建一个基于文件的 log handler
+    """创建一个基于文件的 log handler
     :param target: 一个 Path 对象，或者一个 path 字符串
     """
     logsdir = None
@@ -115,16 +116,16 @@ def _create_file_handler(target, filename, chmod=False):
 
 
 def _create_zmq_handler(target):
-    """ 创建一个基于 zeromq 的 log handler
+    """创建一个基于 zeromq 的 log handler
     :param target: 一个字符串，形如： tcp://127.0.0.1:8334
     """
     return ZeroMQHandler(target)
 
 
 def _create_redis_handler(target, channel):
-    """ 创建一个基于 zeromq 的 log handler
+    """创建一个基于 zeromq 的 log handler
 
-    :param target: redis_url 字符串，形如： 
+    :param target: redis_url 字符串，形如：
         redis://[[username]:[password]]@localhost:6379/0
         rediss://[[username]:[password]]@localhost:6379/0
         unix://[[username]:[password]]@/path/to/socket.sock?db=0
@@ -135,7 +136,7 @@ def _create_redis_handler(target, channel):
 
 
 def get_logging_handler(type_, fmt, level=log.INFO, target=None, name=None):
-    """ 获取一个 logger handler
+    """获取一个 logger handler
 
     :param str type_: stream/file/zmq
     :param str fmt: text/json
@@ -163,16 +164,18 @@ def get_logging_handler(type_, fmt, level=log.INFO, target=None, name=None):
     elif fmt == 'text':
         formatter = log.Formatter(TEXT_LOG_FORMAT)
     else:
-        formatter = jsonlogger.JsonFormatter(JSON_LOG_FORMAT, timestamp=False, json_ensure_ascii=False)
+        formatter = jsonlogger.JsonFormatter(
+            JSON_LOG_FORMAT, timestamp=False, json_ensure_ascii=False
+        )
     handler.setLevel(level)
     handler.setFormatter(formatter)
     return handler
 
 
 def get_pyzog_handler(name, logger_config, target_dir, level=log.INFO):
-    """ 获取一个 pyzog handler
+    """获取一个 pyzog handler
     如果不存在 pyzog 配置，那么会返回一个 file handler
-    
+
     :param name: logger 的名称
     :param config_dict: config.json 配置文件的 dict
     :param target_dir: file handler 的目标文件夹
@@ -184,12 +187,20 @@ def get_pyzog_handler(name, logger_config, target_dir, level=log.INFO):
         pyzog_conf = logger_config.get('pyzog')
 
     if isinstance(pyzog_conf, dict) and len(pyzog_conf) > 0:
-        return get_logging_handler(pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name)
+        return get_logging_handler(
+            pyzog_conf['type'], 'json', level, target=pyzog_conf['target'], name=name
+        )
     return get_logging_handler('file', 'json', level, target=target_dir, name=name)
 
 
-def get_logger(name, target, type_='file', fmt='text', level=log.INFO):
-    """ 基于 target 创建一个 logger
+def get_logger(
+    name: str,
+    target: Path | str,
+    type_: str = 'file',
+    fmt: str = 'text',
+    level: int = log.INFO,
+):
+    """基于 target 创建一个 logger
 
     :param name: logger 的名称，不要带扩展名
     :param target: 项目主目录的的 path 字符串或者 Path 对象，
@@ -213,4 +224,3 @@ def get_logger(name, target, type_='file', fmt='text', level=log.INFO):
     log_.addHandler(hdr)
     log_.setLevel(level)
     return log_
-

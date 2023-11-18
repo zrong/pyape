@@ -46,6 +46,10 @@ class PyapeError(Exception):
         self.code = code
         self.message = message
 
+    def __str__(self) -> str:
+        return self.message if self.message else f'{self.__class__.__name__} {self.code.name}'
+
+
 class AppError(PyapeError):
     """ App 核心错误消息。"""
     pass

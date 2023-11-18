@@ -1,3 +1,4 @@
 -r dev.txt
 fastapi >=0.103.2
+python-multipart
 uvicorn

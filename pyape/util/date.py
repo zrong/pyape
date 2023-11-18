@@ -8,12 +8,16 @@ pyape.util.date
 @created 2022-05-08
 """
 from datetime import date, datetime, timedelta
-from typing import Any, Union, Callable
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Callable
+import time
+from collections.abc import Callable
+
+
+_DSI = datetime | str | int
 
 
 class DateRange(Iterable):
-    """ 根据提供的字符串获取日期列表。
+    """根据提供的字符串获取日期列表。
 
     :param date_text: 月份字符串
         单年：2020
@@ -25,7 +29,7 @@ class DateRange(Iterable):
         单日： 20200724
         多日： 20200724,20210103,20220321
         日范围： 20200724-20220301
-        
+
     :param last_month: 停止在提供的这个月，仅当提供的是年或者月的时候有效。
     :raise ValueError: 如果月份检测不合格抛出 ValueError。
     """
@@ -96,13 +100,18 @@ class DateRange(Iterable):
     def __len__(self) -> int:
         return len(self.to_list())
 
+    @classmethod
+    def make_today(cls, fmt: str=None) -> str:
+        """ 获取今天的字符串形式，若未提供 fmt 参数，则使用 DATE_FMT。"""
+        return date.today().strftime(fmt or cls.DATE_FMT)
+
     def __check_dupli(self, parsed_date: list[str]) -> list[str]:
-        """ 删除重复值，int 为了确保日期是合法整数，str 是方便后面使用 strptime。"""
+        """删除重复值，int 为了确保日期是合法整数，str 是方便后面使用 strptime。"""
         return [str(dl) for dl in {int(d) for d in parsed_date}]
 
     def __range_star_or_end(
         self, index: int, type_: Callable = str
-    ) -> Union[int, datetime, str]:
+    ) -> _DSI:
         if not self.is_range:
             return None
         s = self.parsed_date[index]
@@ -114,20 +123,20 @@ class DateRange(Iterable):
             return datetime(int(s), 1, 1)
         return type_(s)
 
-    def range_start(self, type_: Callable = str) -> Union[int, datetime, str]:
+    def range_start(self, type_: Callable = str) -> _DSI:
         return self.__range_star_or_end(0, type_)
 
-    def range_end(self, type_: Callable = str) -> Union[int, datetime, str]:
+    def range_end(self, type_: Callable = str) -> _DSI:
         return self.__range_star_or_end(1, type_)
 
     def to_list(self) -> list[int]:
-        """ 根据当前 date_type 导出不同的 list。"""
+        """根据当前 date_type 导出不同的 list。"""
         if self.date_type == 'date':
             return self.to_date_list()
         return self.to_month_list()
 
     def to_date_list(self) -> list[int]:
-        """ 导出一个 8 位 date 列表。
+        """导出一个 8 位 date 列表。
 
         :return list[int]: 返回 %Y%m%d 的整数形式列表。
         """
@@ -149,7 +158,7 @@ class DateRange(Iterable):
         ]
 
     def to_month_list(self) -> list[int]:
-        """ 导出一个 6 位 month 列表。
+        """导出一个 6 位 month 列表。
 
         :return list[int]: 返回 %Y%m 的整数形式列表。
         """
@@ -202,33 +211,30 @@ class DateRange(Iterable):
         return month
 
     def to_year_list(self) -> list[int]:
-        """ 导出一个 4 为的 year 列表。
+        """导出一个 4 为的 year 列表。
 
         :return list[int]: 返回 %Y 的整数形式列表。
         """
         month_list = self.to_month_list()
-        year_list = [int(month/100) for month in month_list]
+        year_list = [int(month / 100) for month in month_list]
         # 去重
         return list(set(year_list))
 
 
-
-def date_interval(
-    date1: Union[int, datetime], date2: Union[int, datetime], fmt: str = '%Y%m%d'
-) -> int:
-    d1: datetime = datetime.strptime(str(date1), fmt) if isinstance(
-        date1, int
-    ) else date1
-    d2: datetime = datetime.strptime(str(date2), fmt) if isinstance(
-        date2, int
-    ) else date2
+def date_interval(date1: _DSI, date2: _DSI, fmt: str = '%Y%m%d') -> int:
+    d1: datetime = (
+        date1 if isinstance(date1, datetime) else datetime.strptime(str(date1), fmt)
+    )
+    d2: datetime = (
+        date2 if isinstance(date2, datetime) else datetime.strptime(str(date2), fmt)
+    )
     d: timedelta = d1 - d2
     return abs(d.days)
 
 
 def get_years(start: int = 2017, end: int = None) -> list[int]:
-    """ 获取年份列表。
-    
+    """获取年份列表。
+
     :param start: 开始的年份。
     :param end: 结束的年份。若值为 None 代表今年。
     """
@@ -239,7 +245,7 @@ def get_years(start: int = 2017, end: int = None) -> list[int]:
 
 
 def get_last_month(month: int = None) -> int:
-    """ 获取上一个月的 %Y%m 表达。
+    """获取上一个月的 %Y%m 表达。
 
     :param month: 获取 month 的上一个月。若 month 为 None，则使用 today。
     """
@@ -252,7 +258,7 @@ def get_last_month(month: int = None) -> int:
 
 
 def get_last_12month(month: int = None) -> str:
-    """ 获取最近 12 个月的 %Y%m 表达，形如 202104-202203。
+    """获取最近 12 个月的 %Y%m 表达，形如 202104-202203。
 
     :param month: 获取 month 的上一个月。若 month 为 None，则使用 today。
     """
@@ -263,12 +269,14 @@ def get_last_12month(month: int = None) -> str:
 
 
 def gen_month(year: int, start: int = 1, end: int = 12, type_: Callable = int) -> list:
-    """ 生成月份列表。"""
+    """生成月份列表。"""
     return [type_(f'{year}{md:02}') for md in range(start, end + 1)]
 
 
-def from_month(month_text: str, last_month: int = None, use_year: bool=False) -> list[int]:
-    """ 根据提供的字符串获取日期列表。
+def from_month(
+    month_text: str, last_month: int = None, use_year: bool = False
+) -> list[int]:
+    """根据提供的字符串获取日期列表。
 
     :param month_text: 月份字符串
         单年：2020
@@ -289,7 +297,7 @@ def from_month(month_text: str, last_month: int = None, use_year: bool=False) ->
 
 
 def month2date(month_text: str, last: bool = False) -> int:
-    """ 将一个 month_text 转换成一个日期。
+    """将一个 month_text 转换成一个日期。
     如果提供的年，则转换为当年的一个日期。
     如果提供的是月，则转换为当月的一个日期。
     若提供的是日期，则直接转换为整数。
@@ -307,3 +315,12 @@ def month2date(month_text: str, last: bool = False) -> int:
         d = next_month - timedelta(days=next_month.day)
         return int(d.strftime('%Y%m%d'))
     return int(f'{m}01')
+
+
+def jinja_filter_strftimestamp(ts: float | int | str, fmt: str = None):
+    """将 timestamp 转换成为字符串。"""
+    # fmt = '%Y-%m-%d'
+    dt = datetime.fromtimestamp(float(ts))
+    if fmt is None:
+        return dt.isoformat()
+    return dt.strftime(fmt)

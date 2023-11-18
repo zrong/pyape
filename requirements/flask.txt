@@ -1,4 +1,5 @@
 -r dev.txt
+flask>=2.3.2
 marshmallow
 webargs
 flask-compress

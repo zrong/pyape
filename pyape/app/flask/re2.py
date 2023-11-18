@@ -8,10 +8,11 @@ re2 = request + response
 
 from pathlib import Path
 from datetime import datetime
-from typing import Union
+from collections.abc import Callable
 
 from flask import request, jsonify, make_response, send_file
-from sqlalchemy.orm import Query
+from sqlalchemy.orm import Session
+from sqlalchemy import Select
 
 from pyape.app import gdb, logger
 from pyape.db import Pagination
@@ -19,7 +20,7 @@ from pyape.util.func import parse_float, parse_date, daydt
 
 
 def get_post_data():
-    """ 优先作为 json 获取数据
+    """优先作为 json 获取数据
     如果不是 json 则获取 form 数据
     """
     if request.is_json:
@@ -33,7 +34,7 @@ def get_post_data():
 
 
 def get_request_values(*args, replaceobj=None, defaultvalue={}, request_key='json'):
-    """ 检测提供的 HTTP REQUEST 的值。包括 POST/PUT
+    """检测提供的 HTTP REQUEST 的值。包括 POST/PUT
 
     :param replaceobj: 参数替换。
         例如 ``*args`` 中有个参数名称为 a1，但希望查询 json 中名为 a2 的键，
@@ -41,7 +42,7 @@ def get_request_values(*args, replaceobj=None, defaultvalue={}, request_key='jso
     :param defaultvalue: 默认值。
         若在参数中找不到值，则使用 defaultvalue 中的值替代。
         例如 ``*args`` 中有个参数名称为 a1，但 json 中没有 a1，希望 a1 有一个默认值，则可以提供 {"a1": 42}
-    :param request_key: 可用值为 
+    :param request_key: 可用值为
         args = request.args
         form = request.form
         values = request.values
@@ -79,10 +80,10 @@ def responseto(
     replaceobj_key_only: bool = False,
     return_dict: bool = False,
     bind_key: str = None,
-    **kwargs
+    **kwargs,
 ):
-    """ 封装 json 响应
-    
+    """封装 json 响应
+
     :param message: 错误消息，若提供则默认 error 为 True
     :param error: 是否包含错误
     :param code: 错误代码，若不提供则值可能为 200 error=False/444 error=True
@@ -132,7 +133,7 @@ def responseto(
 
 
 def get_from_to_date(from_date=None, to_date=None, default=True, strftime=False):
-    """ 校验 from_date/to_date 并返回这两个值
+    """校验 from_date/to_date 并返回这两个值
     :param from_date:
     :param to_date:
     :param default: 若值为true，则保证 from_date 和 to_date 有值
@@ -175,16 +176,17 @@ def get_min_max_value_query(query, value_column, min_value=None, max_value=None)
 
 
 def get_page_response(
-    query: Union[Query, dict],
+    query: Select | dict,
     page: int,
     per_page: int,
-    itemskey,
-    return_method=None,
+    itemskey: str,
+    dbs: Session = None,
+    return_method: Callable = None,
     replaceobj=None,
     replaceobj_key_only=False,
-    **kwargs
+    **kwargs,
 ):
-    """ 获取一个多页响应对象
+    """获取一个多页响应对象
 
     :param query: 查询对象，或者直接返回的对象
     :param page: 当前页
@@ -198,9 +200,12 @@ def get_page_response(
     :return: 一个多页响应对象
     """
     data = None
-    if isinstance(query, Query):
+    if isinstance(query, Select):
         try:
-            pagi: Pagination = Pagination.paginate(query, int(page), int(per_page))
+            dbs = dbs or gdb.session()
+            pagi: Pagination = Pagination.paginate(
+                query, dbs, int(page), int(per_page)
+            )
             data = dict(
                 page=pagi.page,
                 prev_num=pagi.prev_num,
@@ -276,4 +281,3 @@ def get_download_response(
     if content_type is not None:
         response.headers['Content-Type'] = content_type
     return response
-

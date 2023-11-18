@@ -12,19 +12,19 @@ from threading import Lock
 
 from collections.abc import Iterable
 from sqlalchemy.schema import Table, MetaData
+from sqlalchemy import Select, func
 from sqlalchemy.orm import (
     DeclarativeMeta,
     declarative_base,
     sessionmaker,
     Session,
     scoped_session,
-    Query,
 )
 from sqlalchemy.engine import Engine, Connection, create_engine, make_url, URL
 
 
 class Pagination(object):
-    """ from flask_sqlalchemy
+    """from flask_sqlalchemy
     Internal helper class returned by :meth:`BaseQuery.paginate`.  You
     can also construct it from any other SQLAlchemy query object if you are
     working with other libraries.  Additionally it is possible to pass `None`
@@ -32,10 +32,13 @@ class Pagination(object):
     no longer work.
     """
 
-    def __init__(self, query: Query, page: int, per_page: int, total: int, items):
+    def __init__(
+        self, query: Select, dbs: Session, page: int, per_page: int, total: int, items
+    ):
         #: the unlimited query object that was used to create this
         #: pagination object.
         self.query = query
+        self.dbs = dbs
         #: the current page number (1 indexed)
         self.page = page
         #: the number of items to be displayed on a page.
@@ -48,12 +51,13 @@ class Pagination(object):
     @classmethod
     def paginate(
         cls,
-        qry: Query,
+        qry: Select,
+        dbs: Session,
         page: int = None,
         per_page: int = None,
         max_per_page: int = None,
     ):
-        """ from flask_sqlalchemy
+        """from flask_sqlalchemy
         Returns ``per_page`` items from page ``page``.
 
         If ``page`` or ``per_page`` are ``None``, they will be retrieved from
@@ -73,11 +77,9 @@ class Pagination(object):
         if max_per_page is not None:
             per_page = min(per_page, max_per_page)
 
-        items = qry.limit(per_page).offset((page - 1) * per_page).all()
-
-        total = qry.order_by(None).count()
-
-        return cls(qry, page, per_page, total, items)
+        items = dbs.scalars(qry.limit(per_page).offset((page - 1) * per_page)).all()
+        total = dbs.scalar(qry.with_only_columns([func.count()]).order_by(None))
+        return cls(qry, dbs, page, per_page, total, items)
 
     @property
     def pages(self):
@@ -91,9 +93,11 @@ class Pagination(object):
     def prev(self):
         """Returns a :class:`Pagination` object for the previous page."""
         assert self.query is not None, (
-            'a query object is required ' 'for this method to work'
+            "a query object is required " "for this method to work"
         )
-        return self.__class__.paginate(self.query, self.page - 1, self.per_page)
+        return self.__class__.paginate(
+            self.query, self.dbs, self.page - 1, self.per_page
+        )
 
     @property
     def prev_num(self):
@@ -110,9 +114,11 @@ class Pagination(object):
     def next(self):
         """Returns a :class:`Pagination` object for the next page."""
         assert self.query is not None, (
-            'a query object is required ' 'for this method to work'
+            "a query object is required " "for this method to work"
         )
-        return self.__class__.paginate(self.query, self.page + 1, self.per_page)
+        return self.__class__.paginate(
+            self.query, self.dbs, self.page + 1, self.per_page
+        )
 
     @property
     def has_next(self):
@@ -168,10 +174,10 @@ class Pagination(object):
 
 class BindMetaMixin(type):
     def __init__(cls, name: str, bases, d):
-        bind_key = d.pop('__bind_key__', None) or getattr(cls, '__bind_key__', None)
+        bind_key = d.pop("__bind_key__", None) or getattr(cls, "__bind_key__", None)
         super(BindMetaMixin, cls).__init__(name, bases, d)
-        if bind_key is not None and getattr(cls, '__table__', None) is not None:
-            cls.__table__.info['bind_key'] = bind_key
+        if bind_key is not None and getattr(cls, "__table__", None) is not None:
+            cls.__table__.info["bind_key"] = bind_key
 
 
 class DefaultMeta(BindMetaMixin, DeclarativeMeta):
@@ -179,8 +185,8 @@ class DefaultMeta(BindMetaMixin, DeclarativeMeta):
 
 
 class DBManager:
-    """ 管理 SQL 连接，创建和管理数据库 Engine，Session，Model。
-    
+    """管理 SQL 连接，创建和管理数据库 Engine，Session，Model。
+
     :param URI: 提供数据库地址。
     :param dict kwargs: 提供数据库连接参数。
     """
@@ -217,12 +223,12 @@ class DBManager:
 
     @property
     def Models(self) -> Iterable:
-        """ 使用 set 形式返回所有的 Model。"""
+        """使用 set 形式返回所有的 Model。"""
         return self.__model_classes.values()
 
     @property
     def bind_keys(self) -> Iterable:
-        """ 使用 set 形式返回所有的 bind_key。若只有一个数据库，
+        """使用 set 形式返回所有的 bind_key。若只有一个数据库，
         返回的是 ``(None,)`` 。
         """
         return self.__model_classes.keys()
@@ -255,15 +261,15 @@ class DBManager:
         sa_url: URL = make_url(uri)
 
         options: dict = self.ENGINE_OPTIONS or {}
-        options.setdefault('future', True)
+        options.setdefault("future", True)
 
-        if sa_url.drivername.startswith('mysql'):
+        if sa_url.drivername.startswith("mysql"):
             # 加入 charset 设置，用于 utf8mb4 这种 charset
             query = dict(sa_url.query)
-            query.setdefault('charset', 'utf8')
+            query.setdefault("charset", "utf8")
             sa_url = sa_url.set(query=query)
 
-            if sa_url.drivername != 'mysql+gaerdbms':
+            if sa_url.drivername != "mysql+gaerdbms":
                 # 对于 MySQL 来说，设置 pool_recycle 是必须的，原因如下：
                 # pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query')
                 # 连接池连接mysql数据库失败，应该是mysql数据库连接超时，mysql数据库配置文件存在以下两个参数，是负责管理连接超时的。
@@ -279,30 +285,30 @@ class DBManager:
                 # 就会继续连接，但是数据库连接断开了，就会报错 2013: Lost connection to MySQL server during query.
                 # pool_recycle 回收时间（就是一定时间内不使用就会回收），修改这个参数的值，不要大于wait_timeout的值即可。下面的设置意味着每隔 7200 秒就回收一次连接线程池。
 
-                options.setdefault('pool_size', 10)
-                options.setdefault('pool_recycle', 7200)
+                options.setdefault("pool_size", 10)
+                options.setdefault("pool_recycle", 7200)
 
-        elif sa_url.drivername == 'sqlite':
-            pool_size = options.get('pool_size')
+        elif sa_url.drivername == "sqlite":
+            pool_size = options.get("pool_size")
             detected_in_memory = False
-            if sa_url.database in (None, '', ':memory:'):
+            if sa_url.database in (None, "", ":memory:"):
                 detected_in_memory = True
 
                 from sqlalchemy.pool import StaticPool
 
-                options['poolclass'] = StaticPool
-                if 'connect_args' not in options:
-                    options['connect_args'] = {}
+                options["poolclass"] = StaticPool
+                if "connect_args" not in options:
+                    options["connect_args"] = {}
                 # https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
-                options['connect_args']['check_same_thread'] = False
+                options["connect_args"]["check_same_thread"] = False
 
                 # we go to memory and the pool size was explicitly set
                 # to 0 which is fail.  Let the user know that
                 if pool_size == 0:
                     raise RuntimeError(
-                        'SQLite in memory database with an '
-                        'empty queue not possible due to data '
-                        'loss.'
+                        "SQLite in memory database with an "
+                        "empty queue not possible due to data "
+                        "loss."
                     )
             # if pool size is None or explicitly set to 0 we assume the
             # user did not want a queue for this sqlite connection and
@@ -310,11 +316,11 @@ class DBManager:
             elif not pool_size:
                 from sqlalchemy.pool import NullPool
 
-                options['poolclass'] = NullPool
+                options["poolclass"] = NullPool
 
         engine = create_engine(sa_url, **options)
 
-        if sa_url.drivername == 'sqlite':
+        if sa_url.drivername == "sqlite":
             # 强制 SQLITE 支持支持外键
             # https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#foreign-key-support
             from sqlalchemy import event
@@ -335,7 +341,7 @@ class DBManager:
         return engine
 
     def set_bind(self, bind_key: str, uri: str):
-        """ 利用 SQLAlchemy 提供的 binds 机制，
+        """利用 SQLAlchemy 提供的 binds 机制，
         将 bind_key 与数据库连接绑定起来。
 
         :param bind_key: 数据库的 bind_key，在 :ref:`pyape_toml` 中定义，
@@ -349,56 +355,53 @@ class DBManager:
         if succ:
             self.Session_Factory.configure(binds=self.__binds)
             return
-        raise KeyError(f'bind_key {bind_key} is duplicated!')
+        raise KeyError(f"bind_key {bind_key} is duplicated!")
 
     def get_Model(self, bind_key: str = None):
         return self.__model_classes.get(bind_key or self.default_bind_key)
 
     def set_Model(self, bind_key: str = None):
-        """ 设置并保存一个 Model。
+        """设置并保存一个 Model。
 
-        :param bind_key: 详见 
+        :param bind_key: 详见
             :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         if self.__model_classes.get(bind_key):
             raise KeyError(bind_key)
 
-        Model = declarative_base(name=bind_key or 'Model', metaclass=DefaultMeta)
+        Model = declarative_base(name=bind_key or "Model", metaclass=DefaultMeta)
         Model.bind_key = bind_key
         self.__model_classes[bind_key] = Model
         return Model
 
     def get_engine(self, bind_key: str = None) -> Engine:
-        """ 获取一个 Engine 对象。
+        """获取一个 Engine 对象。
 
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         return self.__engines.get(bind_key or self.default_bind_key)
 
     def create_new_session(self) -> Session:
-        """ 创建一个 Session 对象。 """
+        """创建一个 Session 对象。"""
         return self.Session_Factory()
 
-    def create_scoped_session(self, in_flask: bool = False) -> scoped_session:
-        """ 创建一个 scoped_session 代理。
+    def create_scoped_session(self, use_greenlet: bool = False) -> scoped_session:
+        """创建一个 scoped_session 代理。
 
-        :param in_flask: 是否在 Flask 中使用。
+        :param use_greenlet: 是否使用 greenlet。
         """
-        if in_flask:
+        if use_greenlet:
             try:
                 from greenlet import getcurrent as _get_ident
             except ImportError:
                 from threading import get_ident as _get_ident
-            # werkzeug/local.py:215: DeprecationWarning: '__ident_func__' is deprecated and will be removed in Werkzeug 2.1. It should not be used in Python 3.7+.
-            # import flask
-            # _get_ident = flask._app_ctx_stack.__ident_func__
             return scoped_session(self.Session_Factory, scopefunc=_get_ident)
         return scoped_session(self.Session_Factory)
 
 
 class SQLAlchemy:
-    """ 创建一个用 sqlalchemy 管理数据库的对象。
+    """创建一个用 sqlalchemy 管理数据库的对象。
     封装常用的高级功能，例如 table 和 query 操作。
 
     :param dbm: DBManager 的实例。
@@ -410,7 +413,7 @@ class SQLAlchemy:
 
     dbm: DBManager = None
     is_scoped: bool = True
-    in_flask: bool = True
+    use_greenlet: bool = False
 
     Session: sessionmaker | scoped_session = None
     """ 根据 is_scoped 的值，保存 sessionmaker 或者 scoped_session 的结果对象。"""
@@ -421,74 +424,64 @@ class SQLAlchemy:
         URI: dict | str = None,
         ENGINE_OPTIONS: dict = None,
         is_scoped: bool = True,
-        in_flask: bool = False,
+        use_greenlet: bool = False,
         **kwargs: dict,
     ) -> None:
-
         if dbm is None:
             dbm = DBManager(URI, ENGINE_OPTIONS, **kwargs)
         self.dbm = dbm
-        self.in_flask = in_flask
-        # 若 in_flask 为真，则 is_scoped 一定为真
-        self.is_scoped = True if in_flask else is_scoped
+        self.use_greenlet = use_greenlet
+        # 若 use_greenlet 为真，则 is_scoped 一定为真
+        self.is_scoped = True if use_greenlet else is_scoped
         if self.is_scoped:
-            self.Session = self.dbm.create_scoped_session(self.in_flask)
+            self.Session = self.dbm.create_scoped_session(self.use_greenlet)
         else:
             self.Session = self.dbm.Session_Factory
 
     def Model(self, bind_key: str = None):
-        """ 获取对应的 Model Factory class。
+        """获取对应的 Model Factory class。
 
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         return self.dbm.get_Model(bind_key)
 
     def isModel(self, instance, bind_key: str = None):
-        """ 判断一个实例是否是 Model 的实例。
+        """判断一个实例是否是 Model 的实例。
 
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         Model = self.Model(bind_key=bind_key)
         return isinstance(instance, Model)
 
     def engine(self, bind_key: str = None) -> Engine:
-        """ 从 DBManager 中获取对应的 engine 实例。
+        """从 DBManager 中获取对应的 engine 实例。
 
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         return self.dbm.get_engine(bind_key)
 
     def connection(self, bind_key: str = None) -> Connection:
-        """ 调用 Engine 的 connect 放来了获取一个 connection 对象。"""
+        """调用 Engine 的 connect 放来了获取一个 connection 对象。"""
         return self.engine(bind_key).connect()
 
     def session(self) -> Session:
-        """ 获取一个 Session 对象。
-        """
+        """获取一个 Session 对象。"""
         return self.Session()
 
-    def query(self, *entities) -> Query:
-        """ 获取一个 Query 对象。
-
-        :param model_cls: 一个 Model对象。
-        """
-        return self.session().query(*entities)
-
     def metadata(self, bind_key: str = None) -> MetaData:
-        """ 获取对应 Model 的 metadata 实例
-        """
+        """获取对应 Model 的 metadata 实例"""
         return self.Model(bind_key).metadata
 
     def create_tables(
         self, table_names: list[str] = None, bind_key: str = None
     ) -> None:
-        """ 创建 table。
+        """创建 table。
 
         :param table_names: 提供 table 名称列表。
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         engine = self.engine(bind_key)
@@ -500,10 +493,10 @@ class SQLAlchemy:
             metadata.create_all(bind=engine, checkfirst=True)
 
     def drop_tables(self, table_names: list[str] = None, bind_key: str = None) -> None:
-        """ 移除 table。
+        """移除 table。
 
         :param table_names: 提供 table 名称列表。
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         engine = self.engine(bind_key)
@@ -515,28 +508,27 @@ class SQLAlchemy:
             metadata.drop_all(bind=engine, checkfirst=True)
 
     def recreate_table(self, *table_names: str, bind_key: str = None) -> None:
-        """ 重建 table，支持单个或者多个名称。"""
+        """重建 table，支持单个或者多个名称。"""
         self.drop_tables(table_names=table_names, bind_key=bind_key)
         self.create_tables(table_names=table_names, bind_key=bind_key)
 
     def create_all(self) -> None:
-        """ 创建所有数据库中的所有表。
-        """
+        """创建所有数据库中的所有表。"""
         for bind_key in self.dbm.bind_keys:
             metadata = self.metadata(bind_key)
             metadata.create_all(bind=self.engine(bind_key), checkfirst=True)
 
     def drop_all(self) -> None:
-        """ 删除所有数据库中的所有表。"""
+        """删除所有数据库中的所有表。"""
         for bind_key in self.dbm.bind_keys:
             metadata = self.metadata(bind_key)
             metadata.drop_all(bind=self.engine(bind_key), checkfirst=True)
 
     def get_table(self, name: str, bind_key: str = None) -> Table:
-        """ 获取一个 Table。
+        """获取一个 Table。
 
         :param name: Table 名称。
-        :param bind_key: 
+        :param bind_key:
             详见 :ref:`pyape.db.DBManager.set_bind <pyape.db.DBManager>` 中的说明。
         """
         return self.metadata(bind_key).tables[name]

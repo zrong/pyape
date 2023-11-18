@@ -14,11 +14,13 @@ from fastapi import FastAPI, APIRouter, Request
 from fastapi.templating import Jinja2Templates
 from starlette.templating import pass_context
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .error import ErrorCode, ConfigError
 from .application import CreateArgument, PyapeApp
 from .config import GlobalConfig
+from .util.date import jinja_filter_strftimestamp
 
 
 _default_create_arg = CreateArgument(
@@ -64,8 +66,9 @@ class PyapeAppFastAPI(PyapeApp):
 
     def create_app(self) -> FastAPI:
         FastAPIClass = self.create_arg.FrameworkAppClass
-        warnings.warn(f'{self.create_arg=}')
-        app: FastAPI = FastAPIClass()
+        debug = self.gconf.getcfg('FASTAPI', 'DEBUG')
+        warnings.warn(f'{self.create_arg=} {debug=}')
+        app: FastAPI = FastAPIClass(debug=debug, title='pyape')
 
         # 挂载静态文件，设置默认名称
         # 若没有提供文件夹设置，文件夹名称也使用相同的名称
@@ -143,7 +146,7 @@ class PyapeAppFastAPI(PyapeApp):
             :param category_filter: filter of categories to limit return values.  Only
                                     categories in the list will be returned.
             """
-            session = context['request']
+            session = context['request'].session
             flashes = session.pop("_flashes") if "_flashes" in session else []
             if category_filter:
                 flashes = list(filter(lambda f: f[0] in category_filter, flashes))
@@ -153,9 +156,13 @@ class PyapeAppFastAPI(PyapeApp):
 
         # 将 flask 的 get_flashed_messages 方法移植过来
         jt.env.globals[get_flashed_messages.__name__] = get_flashed_messages
+        # 加入 strftimestamp filter
+        jt.env.filters['strftimestamp'] = jinja_filter_strftimestamp
         return jt
 
-    def flash(request: Request, message: str, category: str = "message") -> NoReturn:
+    def flash(
+        self, request: Request, message: str, category: str = "message"
+    ) -> NoReturn:
         """MIGRATE FROM FLASK
 
         Flashes a message to the next request.  In order to remove the
@@ -186,6 +193,8 @@ class PyapeAppFastAPI(PyapeApp):
     def render_template(
         self,
         template_name: str,
+        status_code: int = 200,
+        /,
         **context: Any,
     ) -> str:
         """Render a template by name with the given context.
@@ -193,11 +202,22 @@ class PyapeAppFastAPI(PyapeApp):
         :param template_name: The name of the template to render.
         :param context: The variables to make available in the template.
         """
-        return self.templates.TemplateResponse(template_name, context)
+        return self.templates.TemplateResponse(
+            template_name, context, status_code=status_code
+        )
 
     def register_a_router(self, router_obj: APIRouter, url_prefix: str):
         app: FastAPI = self.app
         app.include_router(router_obj, prefix=url_prefix)
+
+    def add_middleware(self, middleware_class: type, **options: Any) -> None:
+        self.app.add_middleware(middleware_class, **options)
+
+    def append_middleware(self, middleware_class: type, **options: Any) -> None:
+        fast_app: FastAPI = self.app
+        if fast_app.middleware_stack is not None:  # pragma: no cover
+            raise RuntimeError("Cannot add middleware after an application has started")
+        fast_app.user_middleware.append(Middleware(middleware_class, **options))
 
     def get_loggers(self) -> list[logging.Logger]:
         from fastapi.logger import logger

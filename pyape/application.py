@@ -233,18 +233,18 @@ class PyapeApp:
         return self.logger
 
     def register_a_router(self, router_obj: FrameworkRouter, url_prefix: str):
+        """注册一个路由。必须由子类自行实现。"""
         raise NotImplementedError(f'{self.__class__.__name__}.register_a_router')
 
     def register_routers(self):
-        """注册路由，必须在 gdb 的创建之后调用。
-        """
-        appmodules = self.gconf.getcfg('PATH', 'modules')
-        for name, url in appmodules.items():
-            router_module = importlib.import_module('.' + name, self.PROJECT_PACKAGE_NAME)
-            # name 可能为 app.name 这样的复合包，这种情况下，路由实例的名称必须设置为 app_name。
-            router_name = name.replace('.', '_')
-            router_obj = getattr(router_module, router_name)
-            self.register_a_router(router_obj, url)
+        """注册路由，必须在 gdb 的创建之后调用。"""
+        routers = self.gconf.getcfg('PATH', 'ROUTER')
+        for router in routers:
+            router_module = importlib.import_module(
+                f'.{router["module"]}', self.PROJECT_PACKAGE_NAME
+            )
+            router_obj = getattr(router_module, router['name'])
+            self.register_a_router(router_obj, router['endpoint'])
 
 
 class PyapeDB(SQLAlchemy):
