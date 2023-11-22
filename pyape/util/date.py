@@ -9,7 +9,6 @@ pyape.util.date
 """
 from datetime import date, datetime, timedelta
 from collections.abc import Iterable, Iterator, Callable
-import time
 from collections.abc import Callable
 
 
@@ -320,19 +319,3 @@ def month2date(month_text: str, last: bool = False) -> int:
         d = next_month - timedelta(days=next_month.day)
         return int(d.strftime('%Y%m%d'))
     return int(f'{m}01')
-
-
-def jinja_filter_strftimestamp(ts: float | int | str | None, fmt: str = None):
-    """将 timestamp 转换成为字符串。"""
-    # fmt = '%Y-%m-%d'
-    if ts is None:
-        return ''
-    if isinstance(ts, str) and len(ts.strip()) == 0:
-        return ''
-    ts = float(ts)
-    if ts <= 0:
-        return ''
-    dt = datetime.fromtimestamp(ts)
-    if fmt is None:
-        return dt.isoformat()
-    return dt.strftime(fmt)

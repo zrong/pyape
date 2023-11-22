@@ -20,7 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from .error import ErrorCode, ConfigError
 from .application import CreateArgument, PyapeApp
 from .config import GlobalConfig
-from .util.date import jinja_filter_strftimestamp
+from .util.jinja_filter import jinja_filter_strftimestamp, jinja_filter_filesize
 
 
 _default_create_arg = CreateArgument(
@@ -158,6 +158,7 @@ class PyapeAppFastAPI(PyapeApp):
         jt.env.globals[get_flashed_messages.__name__] = get_flashed_messages
         # 加入 strftimestamp filter
         jt.env.filters['strftimestamp'] = jinja_filter_strftimestamp
+        jt.env.filters['filesize'] = jinja_filter_filesize
         return jt
 
     def flash(

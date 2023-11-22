@@ -17,7 +17,7 @@ from .config import GlobalConfig, Dicto
 from .error import ErrorCode, ConfigError
 from .application import CreateArgument, PyapeApp, PyapeDB
 from .db import DBManager, SQLAlchemy
-from .util.date import jinja_filter_strftimestamp
+from .util.jinja_filter import jinja_filter_strftimestamp, jinja_filter_filesize
 
 
 def flash_dict(d, category: str = 'message'):
@@ -226,6 +226,7 @@ class PyapeAppFlask(PyapeApp):
         self.framework_app = self.create_app()
         # 增加自定义 jinja filter
         self.app.add_template_filter(jinja_filter_strftimestamp, 'strftimestamp')
+        self.app.add_template_filter(jinja_filter_filesize, 'filesize')
         self.init_db()
         self.init_redis()
 
