@@ -108,6 +108,119 @@ class Dicto(dict):
                 parent[k] = v
 
 
+class Config:
+    """提供配置文件的获取与读取功能。"""
+
+    cfg_data: dict = None
+    """ 全局变量，用于保存 config.toml/config.json 中载入的配置。"""
+
+    __work_dir: Path = None
+    """ 工作文件夹。"""
+
+    def __init__(self, *, work_dir: Path = None, cfg: dict | str = 'config.toml'):
+        """初始化全局文件
+        :param Path work_dir: 工作文件夹
+        :param str|dict cfg: 相对于工作文件夹的配置文件地址，或者配置内容本身
+        """
+        self.__work_dir = work_dir
+        if isinstance(cfg, dict):
+            self.cfg_data = cfg
+        else:
+            self.cfg_data = self.read(cfg, throw_error=True)
+
+    @property
+    def work_dir(self) -> Path:
+        if self.__work_dir is None:
+            raise ConfigError('Please set work_dir first!')
+        return Path(self.__work_dir)
+
+    def read(
+        self, filename: str, work_dir: Path = None, throw_error: bool = False
+    ) -> list | dict:
+        """读取一个配置文件，支持 .json 和 .toml 扩展名。
+
+        :param filename: 文件名
+        :param work_dir: str
+        :param throw_error: boolean 若值为 True，则当文件不存在的时候抛出异常
+        :returns: 解析后的 dict
+        :rtype: dict
+        """
+        conf_file = self.getdir(filename, work_dir=work_dir)
+        if conf_file.exists():
+            if filename.endswith('.toml'):
+                with conf_file.open(mode='rb') as f:
+                    return tomllib.load(f)
+            elif filename.endswith('.json'):
+                return json.load(conf_file)
+            elif throw_error:
+                raise ConfigError(f'{conf_file.as_posix()} is not supported!')
+        if throw_error:
+            raise FileNotFoundError(f'{conf_file.as_posix()} is not found!')
+        return {}
+
+    def write(
+        self, filename: str, data_dict: list | dict, work_dir: Path = None
+    ) -> None:
+        """将一个 dict 写入成为配置文件，支持 .toml 和 .json 后缀。
+
+        :param data_dict: 要写入的配置信息
+        """
+        conf_file = self.getdir(filename, work_dir=work_dir)
+        if filename.endswith('.toml'):
+            with conf_file.open(mode='wb') as f:
+                tomli_w.dump(data_dict, f)
+        elif filename.endswith('.json'):
+            json.dump(data_dict, conf_file, ensure_ascii=False, indent=2)
+
+    def getdir(self, *args, work_dir: Path = None) -> Path:
+        """基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
+        如果传递 basedir，就基于这个 basedir 创建路径
+
+        :param args: 传递路径
+        :param Path work_dir: 工作文件夹
+        """
+        if work_dir is not None:
+            return Path(work_dir, *args)
+        return Path(self.work_dir, *args)
+
+    def getcfg(
+        self, *args, default_value: Any = None, data: str | dict = 'cfg_file'
+    ) -> Any:
+        """递归获取 conf 中的值。getcfg 不仅可用于读取 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+
+        :param args: 需要读取的参数，支持多级调用，若级不存在，不会报错。
+        :param default_value: 找不到这个键就提供一个默认值。
+        :param data: 提供一个 dict，否则使用 cfg_data。
+        :return: 获取的配置值
+        """
+        if data == 'cfg_file':
+            data = self.cfg_data
+        if args and isinstance(data, dict):
+            cur_data = data.get(args[0], default_value)
+            return self.getcfg(*args[1:], default_value=default_value, data=cur_data)
+        return data
+
+    def setcfg(self, *args, value: Any, data: str | dict = 'cfg_file') -> None:
+        """递归设置 conf 中的值。setcfg 不仅可用于设置 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
+
+        :param args: 需要设置的参数，支持多级调用，若级不存在，会自动创建一个内缪的 dict。
+        :param data: 提供一个 dict，否则使用 cfg_data。
+        :param value: 需要设置的值。
+        """
+        if data == 'cfg_file':
+            data = self.cfg_data
+        if args and isinstance(data, dict):
+            arg0 = args[0]
+            if len(args) > 1:
+                cur_data = data.get(arg0)
+                if cur_data is None:
+                    cur_data = {}
+                    data[arg0] = cur_data
+                self.setcfg(*args[1:], value=value, data=cur_data)
+            else:
+                data[arg0] = value
+
+
 class RegionalConfig:
     """为 Regional 机制提供的配置文件，用于解析 Regional 配置。"""
 
@@ -166,11 +279,8 @@ class RegionalConfig:
         return regional
 
 
-class GlobalConfig:
-    """全局配置文件，对应 config.toml"""
-
-    cfg_data: dict = None
-    """ 全局变量，用于保存 config.toml/config.json 中载入的配置。"""
+class GlobalConfig(Config):
+    """全局配置文件，一般对应 config.toml。"""
 
     regional: RegionalConfig = None
     """ 如果 Pyape 框架启用了 Regional 机制，则保存 Regional 配置实例。"""
@@ -183,101 +293,9 @@ class GlobalConfig:
         :param Path work_dir: 工作文件夹
         :param str|dict cfg: 相对于工作文件夹的配置文件地址，或者配置内容本身
         """
-        self.__work_dir = work_dir
-        if isinstance(cfg, dict):
-            self.cfg_data = cfg
-        else:
-            self.cfg_data = self.read(cfg, throw_error=True)
+        super().__init__(work_dir=work_dir, cfg=cfg)
         if self.cfg_data:
             self.init_regionals(data=self.cfg_data)
-
-    def read(
-        self, filename: str, work_dir: Path = None, throw_error: bool = False
-    ) -> list | dict:
-        """读取一个配置文件，支持 .json 和 .toml 扩展名。
-
-        :param filename: 文件名
-        :param work_dir: str
-        :param throw_error: boolean 若值为 True，则当文件不存在的时候抛出异常
-        :returns: 解析后的 dict
-        :rtype: dict
-        """
-        conf_file = self.getdir(filename, work_dir=work_dir)
-        if conf_file.exists():
-            if filename.endswith('.toml'):
-                with conf_file.open(mode='rb') as f:
-                    return tomllib.load(f)
-            elif filename.endswith('.json'):
-                return json.load(conf_file)
-            elif throw_error:
-                raise ValueError(f'{conf_file.as_posix()} is not supported!')
-        if throw_error:
-            raise FileNotFoundError(f'{conf_file.as_posix()} is not found!')
-        return {}
-
-    def write(
-        self, filename: str, data_dict: list | dict, work_dir: Path = None
-    ) -> None:
-        """将一个 dict 写入成为配置文件，支持 .toml 和 .json 后缀。
-
-        :param data_dict: 要写入的配置信息
-        """
-        conf_file = self.getdir(filename, work_dir=work_dir)
-        if filename.endswith('.toml'):
-            with conf_file.open(mode='wb') as f:
-                tomli_w.dump(data_dict, f)
-        elif filename.endswith('.json'):
-            json.dump(data_dict, conf_file, ensure_ascii=False, indent=2)
-
-    def getdir(self, *args, work_dir: Path = None) -> Path:
-        """基于当前项目的运行文件夹，返回一个 pathlib.Path 对象
-        如果传递 basedir，就基于这个 basedir 创建路径
-
-        :param args: 传递路径
-        :param Path work_dir: 工作文件夹
-        """
-        if work_dir is not None:
-            return Path(work_dir, *args)
-        if self.__work_dir is None:
-            raise ValueError('Please set work_dir first!')
-        return Path(self.__work_dir, *args)
-
-    def getcfg(
-        self, *args, default_value: Any = None, data: str | dict = 'cfg_file'
-    ) -> Any:
-        """递归获取 conf 中的值。getcfg 不仅可用于读取 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
-
-        :param args: 需要读取的参数，支持多级调用，若级不存在，不会报错。
-        :param default_value: 找不到这个键就提供一个默认值。
-        :param data: 提供一个 dict，否则使用 cfg_data。
-        :return: 获取的配置值
-        """
-        if data == 'cfg_file':
-            data = self.cfg_data
-        if args and isinstance(data, dict):
-            cur_data = data.get(args[0], default_value)
-            return self.getcfg(*args[1:], default_value=default_value, data=cur_data)
-        return data
-
-    def setcfg(self, *args, value: Any, data: str | dict = 'cfg_file') -> None:
-        """递归设置 conf 中的值。setcfg 不仅可用于设置 config.toml 的值，还可以通过传递 data 用于读取任何字典的值。
-
-        :param args: 需要设置的参数，支持多级调用，若级不存在，会自动创建一个内缪的 dict。
-        :param data: 提供一个 dict，否则使用 cfg_data。
-        :param value: 需要设置的值。
-        """
-        if data == 'cfg_file':
-            data = self.cfg_data
-        if args and isinstance(data, dict):
-            arg0 = args[0]
-            if len(args) > 1:
-                cur_data = data.get(arg0)
-                if cur_data is None:
-                    cur_data = {}
-                    data[arg0] = cur_data
-                self.setcfg(*args[1:], value=value, data=cur_data)
-            else:
-                data[arg0] = value
 
     def getdburi(self, *, r: int = None, bind_key: str = None):
         """获取配置文件中保存的数据库配置。

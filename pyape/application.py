@@ -274,14 +274,14 @@ class PyapeDB(SQLAlchemy):
 
         # 支持从一个已有的 dbinst 对象中共享 dbm 对象。用于项目中有多套 SQLAlchemy 的情况。
         if isinstance(dbinst, SQLAlchemy):
-            super().__init__(dbm=dbinst.dbm, is_scoped=True, in_flask=True)
+            super().__init__(dbm=dbinst.dbm, is_scoped=True, use_greenlet=True)
         elif isinstance(dbinst, DBManager):
-            super().__init__(dbm=dbinst, is_scoped=True, in_flask=True)
+            super().__init__(dbm=dbinst, is_scoped=True, use_greenlet=True)
         else:
             sql_uri = self._gconf.getcfg('SQLALCHEMY', 'URI')
             sql_options = self._gconf.getcfg('SQLALCHEMY', 'ENGINE_OPTIONS')
             super().__init__(
-                URI=sql_uri, ENGINE_OPTIONS=sql_options, is_scoped=True, in_flask=True
+                URI=sql_uri, ENGINE_OPTIONS=sql_options, is_scoped=True, use_greenlet=True
             )
 
     def get_app(self, reference_app: FrameworkApp = None) -> FrameworkApp:

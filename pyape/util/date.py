@@ -101,17 +101,22 @@ class DateRange(Iterable):
         return len(self.to_list())
 
     @classmethod
-    def make_today(cls, fmt: str=None) -> str:
-        """ 获取今天的字符串形式，若未提供 fmt 参数，则使用 DATE_FMT。"""
+    def make_today(cls, fmt: str = None) -> str:
+        """获取今天的字符串形式，若未提供 fmt 参数，则使用 DATE_FMT。"""
         return date.today().strftime(fmt or cls.DATE_FMT)
+
+    @classmethod
+    def make_this_year(cls, fmt: str = None) -> str:
+        """获取今年的第一天到今天的范围字符串。 若未提供 fmt 参数，则使用 DATE_FMT。"""
+        today = date.today()
+        first_day_of_this_year = date(today.year, 1, 1).strftime(fmt or cls.DATE_FMT)
+        return f'{first_day_of_this_year}-{today.strftime(fmt or cls.DATE_FMT)}'
 
     def __check_dupli(self, parsed_date: list[str]) -> list[str]:
         """删除重复值，int 为了确保日期是合法整数，str 是方便后面使用 strptime。"""
         return [str(dl) for dl in {int(d) for d in parsed_date}]
 
-    def __range_star_or_end(
-        self, index: int, type_: Callable = str
-    ) -> _DSI:
+    def __range_star_or_end(self, index: int, type_: Callable = str) -> _DSI:
         if not self.is_range:
             return None
         s = self.parsed_date[index]
@@ -317,10 +322,17 @@ def month2date(month_text: str, last: bool = False) -> int:
     return int(f'{m}01')
 
 
-def jinja_filter_strftimestamp(ts: float | int | str, fmt: str = None):
+def jinja_filter_strftimestamp(ts: float | int | str | None, fmt: str = None):
     """将 timestamp 转换成为字符串。"""
     # fmt = '%Y-%m-%d'
-    dt = datetime.fromtimestamp(float(ts))
+    if ts is None:
+        return ''
+    if isinstance(ts, str) and len(ts.strip()) == 0:
+        return ''
+    ts = float(ts)
+    if ts <= 0:
+        return ''
+    dt = datetime.fromtimestamp(ts)
     if fmt is None:
         return dt.isoformat()
     return dt.strftime(fmt)

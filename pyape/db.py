@@ -9,21 +9,96 @@ pyape.db
 """
 import math
 from threading import Lock
+from typing import Self, TypeAlias
+from collections.abc import Iterable, Callable
+from dataclasses import dataclass, field
 
 from collections.abc import Iterable
 from sqlalchemy.schema import Table, MetaData
 from sqlalchemy import Select, func
-from sqlalchemy.orm import (
-    DeclarativeMeta,
-    declarative_base,
-    sessionmaker,
-    Session,
-    scoped_session,
-)
+from sqlalchemy import orm
 from sqlalchemy.engine import Engine, Connection, create_engine, make_url, URL
 
 
-class Pagination(object):
+_URIMaker: TypeAlias = Callable[[int], str]
+
+
+@dataclass
+class PagiPager:
+    """指示链接到一页的所有信息。"""
+
+    is_first: bool = False
+    """ 是否首页。"""
+
+    is_last: bool = False
+    """ 是否末页。"""
+
+    is_current: bool = False
+    """ 是否当前页。"""
+
+    uri: str = None
+    """ 链接到该页的 URI。"""
+
+    page: int = 0
+    """ 该页的页码。"""
+
+
+@dataclass
+class PagiPointer:
+    """定义页面指示器，包含一系列 PagiPager 对象。"""
+
+    page: int
+    """ 当前页编号，同 Pagination.page。"""
+
+    size: int
+    """ 一个页面拥有的记录条数，同 Pagination.size。"""
+
+    pages: int
+    """ 所有记录的页面总数，同 Pagination.pages。"""
+
+    total: int
+    """ 所有记录总数，同 Pagination.total。"""
+
+    uri_maker: _URIMaker
+    """ 创建 uri 的方法。"""
+
+    first: PagiPager = None
+    """ 首页。"""
+
+    last: PagiPager = None
+    """ 末页。"""
+
+    current: PagiPager = None
+    """ 当前页。"""
+
+    prev: PagiPager = None
+    """ 前一页。"""
+
+    next: PagiPager = None
+    """ 下一页。"""
+
+    pagers: list[PagiPager] = field(default_factory=list)
+    """ 所有中间页的列表。"""
+
+    def pager(self, page: int, append: bool = False) -> PagiPager:
+        """根据 page 的值创建一个 PagiPager 对象，并填充和完善 self.pagers。"""
+        pg = PagiPager(page=page)
+        if page == 1:
+            pg.is_first = True
+            self.first = pg
+        if page == self.pages:
+            pg.is_last = True
+            self.last = pg
+        if page == self.page:
+            pg.is_current = True
+            self.current = pg
+        pg.uri = self.uri_maker(page)
+        if append:
+            self.pagers.append(pg)
+        return pg
+
+
+class Pagination:
     """from flask_sqlalchemy
     Internal helper class returned by :meth:`BaseQuery.paginate`.  You
     can also construct it from any other SQLAlchemy query object if you are
@@ -32,8 +107,21 @@ class Pagination(object):
     no longer work.
     """
 
+    dbs: orm.Session = None
+    query: Select = None
+
+    page: int = 1
+    size: int = 1
+    total: int = 0
+
     def __init__(
-        self, query: Select, dbs: Session, page: int, per_page: int, total: int, items
+        self,
+        query: Select,
+        dbs: orm.Session,
+        page: int,
+        size: int,
+        total: int,
+        items,
     ):
         #: the unlimited query object that was used to create this
         #: pagination object.
@@ -42,7 +130,7 @@ class Pagination(object):
         #: the current page number (1 indexed)
         self.page = page
         #: the number of items to be displayed on a page.
-        self.per_page = per_page
+        self.size = size
         #: the total number of items matching the query
         self.total = total
         #: the items for the current page
@@ -52,16 +140,16 @@ class Pagination(object):
     def paginate(
         cls,
         qry: Select,
-        dbs: Session,
+        dbs: orm.Session,
         page: int = None,
-        per_page: int = None,
-        max_per_page: int = None,
-    ):
+        size: int = None,
+        max_size: int = None,
+    ) -> Self:
         """from flask_sqlalchemy
-        Returns ``per_page`` items from page ``page``.
+        Returns ``size`` items from page ``page``.
 
-        If ``page`` or ``per_page`` are ``None``, they will be retrieved from
-        the request query. If ``max_per_page`` is specified, ``per_page`` will
+        If ``page`` or ``size`` are ``None``, they will be retrieved from
+        the request query. If ``max_size`` is specified, ``size`` will
         be limited to that value. If there is no request or they aren't in the
         query, they default to 1 and 20 respectively.
 
@@ -71,68 +159,72 @@ class Pagination(object):
         if page is None or page < 1:
             page = 1
 
-        if per_page is None or per_page < 0:
-            per_page = 20
+        if size is None or size < 0:
+            size = 20
 
-        if max_per_page is not None:
-            per_page = min(per_page, max_per_page)
+        if max_size is not None:
+            size = min(size, max_size)
 
-        items = dbs.scalars(qry.limit(per_page).offset((page - 1) * per_page)).all()
-        total = dbs.scalar(qry.with_only_columns([func.count()]).order_by(None))
-        return cls(qry, dbs, page, per_page, total, items)
+        items = dbs.scalars(qry.limit(size).offset((page - 1) * size)).all()
+        total = dbs.scalar(
+            qry.with_only_columns(func.count(), maintain_column_froms=True)
+        )
+        return cls(qry, dbs, page, size, total, items)
 
     @property
-    def pages(self):
+    def pages(self) -> int:
         """The total number of pages"""
-        if self.per_page == 0:
+        if self.size == 0:
             pages = 0
         else:
-            pages = int(math.ceil(self.total / float(self.per_page)))
+            pages = int(math.ceil(self.total / float(self.size)))
         return pages
 
-    def prev(self):
+    def prev(self) -> Self:
         """Returns a :class:`Pagination` object for the previous page."""
         assert self.query is not None, (
             "a query object is required " "for this method to work"
         )
-        return self.__class__.paginate(
-            self.query, self.dbs, self.page - 1, self.per_page
-        )
+        return self.__class__.paginate(self.query, self.dbs, self.page - 1, self.size)
 
     @property
-    def prev_num(self):
+    def prev_page(self) -> int:
         """Number of the previous page."""
         if not self.has_prev:
             return None
         return self.page - 1
 
     @property
-    def has_prev(self):
+    def has_prev(self) -> bool:
         """True if a previous page exists"""
         return self.page > 1
 
-    def next(self):
+    def next(self) -> Self:
         """Returns a :class:`Pagination` object for the next page."""
         assert self.query is not None, (
             "a query object is required " "for this method to work"
         )
-        return self.__class__.paginate(
-            self.query, self.dbs, self.page + 1, self.per_page
-        )
+        return self.__class__.paginate(self.query, self.dbs, self.page + 1, self.size)
 
     @property
-    def has_next(self):
+    def has_next(self) -> bool:
         """True if a next page exists."""
         return self.page < self.pages
 
     @property
-    def next_num(self):
+    def next_page(self) -> int:
         """Number of the next page"""
         if not self.has_next:
             return None
         return self.page + 1
 
-    def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
+    def iter_pages(
+        self,
+        left_edge: int = 2,
+        left_current: int = 2,
+        right_current: int = 5,
+        right_edge: int = 2,
+    ) -> Iterable[int]:
         """Iterates over the page numbers in the pagination.  The four
         parameters control the thresholds how many numbers should be produced
         from the sides.  Skipped page numbers are represented as `None`.
@@ -171,6 +263,30 @@ class Pagination(object):
                 yield num
                 last = num
 
+    def point(
+        self,
+        uri_maker: _URIMaker,
+        left_edge: int = 2,
+        left_current: int = 2,
+        right_current: int = 5,
+        right_edge: int = 2,
+    ) -> PagiPointer:
+        """返回一个分页指针对象。"""
+        pointer = PagiPointer(self.page, self.size, self.pages, self.total, uri_maker)
+        for page in self.iter_pages(left_edge, left_current, right_current, right_edge):
+            if page is None:
+                pointer.pagers.append(None)
+            else:
+                pointer.pager(page, append=True)
+                if self.has_next:
+                    pointer.next = pointer.pager(self.next_page, append=False)
+                if self.has_prev:
+                    pointer.prev = pointer.pager(self.prev_page, append=False)
+        return pointer
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__} total={self.total} page={self.page}, size={self.size}, pages={self.pages}>'
+
 
 class BindMetaMixin(type):
     def __init__(cls, name: str, bases, d):
@@ -180,7 +296,7 @@ class BindMetaMixin(type):
             cls.__table__.info["bind_key"] = bind_key
 
 
-class DefaultMeta(BindMetaMixin, DeclarativeMeta):
+class DefaultMeta(BindMetaMixin, orm.DeclarativeMeta):
     pass
 
 
@@ -201,12 +317,12 @@ class DBManager:
     """ 从配置文件中解析出的 ENGINE_OPTION 值。用于数据库引擎的配置。"""
 
     Session_Factory = None
-    """ Session 工厂类，使用 sessionmaker 生成。"""
+    """ Session 工厂类，使用 orm.sessionmaker 生成。"""
 
     __engine_lock: Lock = Lock()
     # 保存 engines 对象
     __engines: dict = None
-    # 保存 sessionmaker 需要的 binds 参数
+    # 保存 orm.sessionmaker 需要的 binds 参数
     __binds: dict = None
     # 保存所有的 Model class
     __model_classes: dict = None
@@ -245,7 +361,7 @@ class DBManager:
         for name, uri in view:
             self.__add_bind(name, uri)
 
-        self.Session_Factory = sessionmaker(
+        self.Session_Factory = orm.sessionmaker(
             binds=self.__binds, autoflush=False, future=True
         )
 
@@ -369,7 +485,7 @@ class DBManager:
         if self.__model_classes.get(bind_key):
             raise KeyError(bind_key)
 
-        Model = declarative_base(name=bind_key or "Model", metaclass=DefaultMeta)
+        Model = orm.declarative_base(name=bind_key or "Model", metaclass=DefaultMeta)
         Model.bind_key = bind_key
         self.__model_classes[bind_key] = Model
         return Model
@@ -382,12 +498,12 @@ class DBManager:
         """
         return self.__engines.get(bind_key or self.default_bind_key)
 
-    def create_new_session(self) -> Session:
+    def create_new_session(self) -> orm.Session:
         """创建一个 Session 对象。"""
         return self.Session_Factory()
 
-    def create_scoped_session(self, use_greenlet: bool = False) -> scoped_session:
-        """创建一个 scoped_session 代理。
+    def create_scoped_session(self, use_greenlet: bool = False) -> orm.scoped_session:
+        """创建一个 orm.scoped_session 代理。
 
         :param use_greenlet: 是否使用 greenlet。
         """
@@ -396,8 +512,8 @@ class DBManager:
                 from greenlet import getcurrent as _get_ident
             except ImportError:
                 from threading import get_ident as _get_ident
-            return scoped_session(self.Session_Factory, scopefunc=_get_ident)
-        return scoped_session(self.Session_Factory)
+            return orm.scoped_session(self.Session_Factory, scopefunc=_get_ident)
+        return orm.scoped_session(self.Session_Factory)
 
 
 class SQLAlchemy:
@@ -415,8 +531,8 @@ class SQLAlchemy:
     is_scoped: bool = True
     use_greenlet: bool = False
 
-    Session: sessionmaker | scoped_session = None
-    """ 根据 is_scoped 的值，保存 sessionmaker 或者 scoped_session 的结果对象。"""
+    Session: orm.sessionmaker | orm.scoped_session = None
+    """ 根据 is_scoped 的值，保存 orm.sessionmaker 或者 orm.scoped_session 的结果对象。"""
 
     def __init__(
         self,
@@ -467,7 +583,7 @@ class SQLAlchemy:
         """调用 Engine 的 connect 放来了获取一个 connection 对象。"""
         return self.engine(bind_key).connect()
 
-    def session(self) -> Session:
+    def session(self) -> orm.Session:
         """获取一个 Session 对象。"""
         return self.Session()
 
