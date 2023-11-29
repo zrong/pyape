@@ -16,6 +16,7 @@ from starlette.templating import pass_context
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.cors import CORSMiddleware
 
 from .error import ErrorCode, ConfigError
 from .application import CreateArgument, PyapeApp
@@ -99,6 +100,12 @@ class PyapeAppFastAPI(PyapeApp):
 
         app.add_middleware(SessionMiddleware, secret_key=secret_key)
         warnings.warn(f'Add SessionMiddleware {secret_key=}')
+
+        # 处理跨域
+        cors = self.gconf.getcfg('CORS')
+        if isinstance(cors, dict):
+            lower_cors = {k.lower():v for k, v in cors.items()}
+            app.add_middleware(CORSMiddleware, **lower_cors)
 
         return app
 

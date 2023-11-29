@@ -149,7 +149,10 @@ TRUSTED_TOKENS = []
 SECRET_KEY = '{{SECRET_KEY}}'
 
 # flask 框架的配置
-['config.toml'.FLASK]
+# ['config.toml'.FLASK]
+
+# fastapi 框架的专用配置
+# ['config.toml'.FASTAPI]
 
 ['config.toml'.SQLALCHEMY]
 # 单数据库地址配置， {{WORK_DIR}} 被替换为 pyape 运行文件夹的绝对路径
@@ -204,11 +207,42 @@ pool_recycle = 3600
 # target = 'redis://:123456@127.0.0.1:6379/0'
 
 ['config.toml'.PATH]
-STATIC_URL_PATH = '/pyapeapi'
-#STATIC_FOLDER = 'dist'
+STATIC_FOLDER = 'client/dist/static'
+STATIC_URL_PATH = '/static'
+TEMPLATE_FOLDER = 'client/dist/template'
 
-['config.toml'.PATH.modules]
-cf = '/pyapeapi/cf'
+# ROUTER 配置
+[['config.toml'.PATH.ROUTER]]
+# router 对象名称
+name = 'cf'
+# router 对象所处的模块
+module = 'view.cf'
+# router 对象对应的端点
+endpoint = '/pyapeapi/cf'
+
+# 跨域配置 https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS
+['config.toml'.CORS]
+# https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
+ALLOW_ORIGINS = ['*']
+# 也支持多个 origin 设置
+# ALLOW_ORIGIN = ['http://localhost', 'http://localhost:8080']
+# 也允许使用正则
+# ALLOW_ORIGIN_REGEX = 'https?://localhost(:8080)?'
+
+# https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Access-Control-Allow-Methods
+ALLOW_METHODS = ['HEAD', 'GET', 'GET']
+
+# https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Access-Control-Allow-Headers
+ALLOW_HEADERS = ['Content-Type']
+
+# https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Access-Control-Expose-Headers
+# EXPOSE_HEADERS = ['*']
+
+# https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Access-Control-Allow-Credentials
+# ALLOW_CREDENTIALS = true
+
+# https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Access-Control-Max-Age
+# MAX_AGE = 7200
 
 #==============================================
 # 以下配置覆盖上面的配置
@@ -233,8 +267,10 @@ STATIC_FOLDER = 'dist'
 STATIC_URL_PATH = '/static'
 TEMPLATE_FOLDER = 'dist/template'
 
-[ENV.local.'config.toml'.PATH.modules]
-cf = '/cf'
+[[ENV.local.'config.toml'.PATH.ROUTER]]
+name = 'cf'
+module = 'view.cf'
+endpoint = '/cf'
 
 [[ENV.local.'config.toml'.REGIONALS]]
 name = '测试服1000'

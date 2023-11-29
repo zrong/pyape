@@ -6,11 +6,12 @@ pyape.util.encrypt
 """
 import re
 import base64
-from typing import Union
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+
+from ..error import EncryptError
 
 ZERO_RE = re.compile(r'[\x00-\x1F]+$')
 
@@ -26,7 +27,7 @@ class AES_CBC(object):
     def encrypt(self, plain_txt):
         return None
 
-    def decrypt(self, cipher: Union[str, bytes]) -> str:
+    def decrypt(self, cipher: str | bytes) -> str:
         decryptor = self._cipher.decryptor()
         if isinstance(cipher, str):
             cipher = cipher.encode()
@@ -53,15 +54,18 @@ class Encrypt(object):
     def __init__(self, key: str) -> None:
         self._factory = Fernet(key.encode())
 
-    def encrypt(self, plain: Union[str, bytes]) -> str:
+    def encrypt(self, plain: str | bytes) -> str:
         """ 对提供的 plain_text 进行加密。"""
         if isinstance(plain, str):
             plain = plain.encode()
         return self._factory.encrypt(plain).decode()
 
-    def decrypt(self, cipher: Union[str, bytes]) -> str:
+    def decrypt(self, cipher: str | bytes) -> str:
         """ 对提供的 cipher_text 进行解密。"""
         if isinstance(cipher, str):
             cipher = cipher.encode()
-        return self._factory.decrypt(cipher).decode()
-    
+        try:
+            txt = self._factory.decrypt(cipher).decode()
+            return txt
+        except InvalidToken:
+            raise EncryptError(f'Invalid Token: {cipher!s}')

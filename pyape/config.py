@@ -18,7 +18,7 @@ import tomli_w
 
 from .util.encrypt import Encrypt
 from .util.func import parse_int
-from .error import ConfigError, ErrorCode
+from .error import ConfigError, ErrorCode, EncryptError
 
 
 def merge_dict(x: dict, y: dict, z: dict = None) -> dict:
@@ -369,14 +369,17 @@ class GlobalConfig(Config):
         >>> decode_token('b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c')
         {'r': 0, 'uid': 0, 'usertype': 50, 'status': 1, 'expires': False}
         """
-        self._build_encrypter()
-        tokenobj = json.loads(self.encrypter.decrypt(token))
-        # 指示是否过期
-        now = int(time.time())
-        ts = tokenobj.get('ts')
-        tokenobj['expires'] = ts < now
-        tokenobj['difftime'] = ts - now
-        return Dicto(tokenobj)
+        try:
+            self._build_encrypter()
+            tokenobj = json.loads(self.encrypter.decrypt(token))
+            # 指示是否过期
+            now = int(time.time())
+            ts = tokenobj.get('ts')
+            tokenobj['expires'] = ts < now
+            tokenobj['difftime'] = ts - now
+            return Dicto(tokenobj)
+        except json.JSONDecodeError as e:
+            return EncryptError(e.msg)
 
     def init_regionals(self, data: str | dict = 'cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)

@@ -121,7 +121,6 @@ class Pagination:
         page: int,
         size: int,
         total: int,
-        items,
     ):
         #: the unlimited query object that was used to create this
         #: pagination object.
@@ -133,8 +132,17 @@ class Pagination:
         self.size = size
         #: the total number of items matching the query
         self.total = total
-        #: the items for the current page
-        self.items = items
+
+    def _check_query(self):
+        assert isinstance(self.query, Select), (
+            "a query object is required " "for this method to work"
+        )
+
+    @property
+    def limit_query(self) -> Select:
+        """返回一个根据 query 创建的限制查询语句。"""
+        self._check_query()
+        return self.query.limit(self.size).offset((self.page - 1) * self.size)
 
     @classmethod
     def paginate(
@@ -165,11 +173,10 @@ class Pagination:
         if max_size is not None:
             size = min(size, max_size)
 
-        items = dbs.scalars(qry.limit(size).offset((page - 1) * size)).all()
         total = dbs.scalar(
             qry.with_only_columns(func.count(), maintain_column_froms=True)
         )
-        return cls(qry, dbs, page, size, total, items)
+        return cls(qry, dbs, page, size, total)
 
     @property
     def pages(self) -> int:
@@ -182,9 +189,7 @@ class Pagination:
 
     def prev(self) -> Self:
         """Returns a :class:`Pagination` object for the previous page."""
-        assert self.query is not None, (
-            "a query object is required " "for this method to work"
-        )
+        self._check_query()
         return self.__class__.paginate(self.query, self.dbs, self.page - 1, self.size)
 
     @property
@@ -201,9 +206,7 @@ class Pagination:
 
     def next(self) -> Self:
         """Returns a :class:`Pagination` object for the next page."""
-        assert self.query is not None, (
-            "a query object is required " "for this method to work"
-        )
+        self._check_query()
         return self.__class__.paginate(self.query, self.dbs, self.page + 1, self.size)
 
     @property

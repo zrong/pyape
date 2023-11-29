@@ -60,3 +60,6 @@ class ConfigError(PyapeError):
     pass
 
 
+class EncryptError(PyapeError):
+    """ 加密和解密错误。"""
+    pass
