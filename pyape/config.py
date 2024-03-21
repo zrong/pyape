@@ -11,6 +11,7 @@ pyape.config
 import re
 from pathlib import Path
 import json
+import pickle
 import time
 from typing import Any
 import tomllib
@@ -345,21 +346,20 @@ class GlobalConfig(Config):
                 )
             self.encrypter = Encrypt(secret_key)
 
-    def encode_token(self, expire: int = 86400, ts: int = None, **kwargs: dict) -> str:
+    def encode_token(self, expire_in: int = 86400, expire_at: int = None, **kwargs: dict) -> str:
         """使用 Fernet 算法加密一组值为 token 用于鉴权。
 
-        :param expire: 过期时间，单位秒。 3600*24 = 86400。
-        :param ts: 过期时间戳，单位秒。若不提供则使用 当前时间+expire。
+        :param expire_in: 从现在开始，多少秒内过期。 3600*24 = 86400。
+        :param expire_at: 过期时间戳，超过这个时间代表过期。单位秒。若不提供则使用 now + expire_in。
 
         >>> encode_token(r=0, uid=1, nickname='超级管理员', usertype=50)
         'b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c'
         """
         self._build_encrypter()
-        if ts is None:
-            ts = int(time.time()) + expire
-        kwargs['ts'] = ts
-        kwargs['expire_at'] = ts
-        return self.encrypter.encrypt(json.dumps(kwargs))
+        if expire_at is None:
+            expire_at = int(time.time()) + expire_in
+        kwargs['expire_at'] = expire_at
+        return self.encrypter.encrypt(pickle.dumps(kwargs, pickle.HIGHEST_PROTOCOL)).decode()
 
     def decode_token(self, token: str) -> Dicto:
         """解密使用 encode_token 加密的字符串。
@@ -367,19 +367,19 @@ class GlobalConfig(Config):
         :param token: 需要解密的 token 字符串。
 
         >>> decode_token('b929a9f08a7ba1a01578ec5a8ecd75b7a06431b18866f1132a56aca667c3b33c')
-        {'r': 0, 'uid': 0, 'usertype': 50, 'status': 1, 'expires': False}
+        {'r': 0, 'uid': 0, 'usertype': 50, 'status': 1, 'expire_at': unix时间戳单位秒, 'expires': False}
         """
         try:
             self._build_encrypter()
-            tokenobj = json.loads(self.encrypter.decrypt(token))
+            tokenobj = pickle.loads(self.encrypter.decrypt(token))
             # 指示是否过期
             now = int(time.time())
-            ts = tokenobj.get('ts')
-            tokenobj['expires'] = ts < now
-            tokenobj['difftime'] = ts - now
+            expire_at = tokenobj.get('expire_at')
+            tokenobj['expires'] = expire_at < now
+            tokenobj['expire_in'] = expire_at - now
             return Dicto(tokenobj)
-        except json.JSONDecodeError as e:
-            return EncryptError(e.msg)
+        except pickle.PickleError as e:
+            return EncryptError(e.args)
 
     def init_regionals(self, data: str | dict = 'cfg_file') -> None:
         rlist = self.getcfg('REGIONALS', data=data)

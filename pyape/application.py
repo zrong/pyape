@@ -177,7 +177,7 @@ class PyapeApp:
             if uwsgiproxy.in_uwsgi:
                 cache_type = 'uwsgi'
             else:
-                cache_type = 'file'
+                cache_type = 'dict'
                 kwargs['fpath'] = self.gconf.getdir('cache.toml')
         else:
             cache_type = 'redis'

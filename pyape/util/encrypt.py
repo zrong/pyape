@@ -15,14 +15,18 @@ from ..error import EncryptError
 
 ZERO_RE = re.compile(r'[\x00-\x1F]+$')
 
+
 class AES_CBC(object):
-    """ 使用 AES 进行对称加解密。
+    """使用 AES 进行对称加解密。
 
     :param key: 密钥。
     :param iv: iv。
     """
+
     def __init__(self, key, iv):
-        self._cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        self._cipher = Cipher(
+            algorithms.AES(key), modes.CBC(iv), backend=default_backend()
+        )
 
     def encrypt(self, plain_txt):
         return None
@@ -41,31 +45,32 @@ class AES_CBC(object):
 
 
 class Encrypt(object):
-    """ 使用 Fernet 模块进行对称加解密。
+    """使用 Fernet 模块进行对称加解密。
 
     :param key: 密钥。
     """
+
     @staticmethod
     def fernet_key() -> bytes:
-        """ 生成一个 fernet 密钥。 """
+        """生成一个 fernet 密钥。"""
         key = Fernet.generate_key()
         return key
 
     def __init__(self, key: str) -> None:
         self._factory = Fernet(key.encode())
 
-    def encrypt(self, plain: str | bytes) -> str:
-        """ 对提供的 plain_text 进行加密。"""
+    def encrypt(self, plain: str | bytes) -> bytes:
+        """对提供的 plain_text 进行加密。"""
         if isinstance(plain, str):
             plain = plain.encode()
-        return self._factory.encrypt(plain).decode()
+        return self._factory.encrypt(plain)
 
-    def decrypt(self, cipher: str | bytes) -> str:
-        """ 对提供的 cipher_text 进行解密。"""
+    def decrypt(self, cipher: str | bytes) -> bytes:
+        """对提供的 cipher_text 进行解密。"""
         if isinstance(cipher, str):
             cipher = cipher.encode()
         try:
-            txt = self._factory.decrypt(cipher).decode()
+            txt = self._factory.decrypt(cipher)
             return txt
-        except InvalidToken:
-            raise EncryptError(f'Invalid Token: {cipher!s}')
+        except (InvalidToken, UnicodeDecodeError) as e:
+            raise EncryptError(f'Invalid Token: {cipher!s}, error: {e!s}')
