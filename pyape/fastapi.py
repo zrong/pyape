@@ -210,8 +210,9 @@ class PyapeAppFastAPI(PyapeApp):
         :param template_name: The name of the template to render.
         :param context: The variables to make available in the template.
         """
+        request = context.get('request')
         return self.templates.TemplateResponse(
-            template_name, context, status_code=status_code
+            request, template_name, context, status_code=status_code
         )
 
     def register_a_router(self, router_obj: APIRouter, url_prefix: str):
