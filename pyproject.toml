@@ -8,10 +8,10 @@ authors = [{ name = "zrong", email = "zrongzrong@gmail.com" }]
 readme = "README.md"
 license = { file = "LICENSE" }
 dynamic = ["version", "description"]
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 keywords = ["development", "zrong", "flask", "fastapi"]
 classifiers = [
-    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.13',
     'Development Status :: 4 - Beta',
     'Environment :: Console',
     'Environment :: Web Environment',

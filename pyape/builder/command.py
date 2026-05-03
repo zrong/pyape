@@ -160,9 +160,15 @@ main: typer.Typer = typer.Typer()
 
 sub_gen: typer.Typer = typer.Typer(name='gen', help='「本地」生成器，生成常用字符串。')
 sub_conf: typer.Typer = typer.Typer(name='conf', help='「本地/远程」处理配置文件。')
-sub_uwsgi: typer.Typer = typer.Typer(name='uwsgi', help='「远程」处理远程服务器上的 uWSGI 相关功能。')
-sub_venv: typer.Typer = typer.Typer(name='venv', help='「远程」处理远程服务器上的 Python 虚拟环境。')
-sub_server: typer.Typer = typer.Typer(name='server', help='「远程」操作远程服务器进程。')
+sub_uwsgi: typer.Typer = typer.Typer(
+    name='uwsgi', help='「远程」处理远程服务器上的 uWSGI 相关功能。'
+)
+sub_venv: typer.Typer = typer.Typer(
+    name='venv', help='「远程」处理远程服务器上的 Python 虚拟环境。'
+)
+sub_server: typer.Typer = typer.Typer(
+    name='server', help='「远程」操作远程服务器进程。'
+)
 
 main.add_typer(sub_gen)
 main.add_typer(sub_conf)
@@ -188,7 +194,9 @@ def main_callback(
 def main_init(
     name: Annotated[
         list[StrEnum('MainProjectName', list(MainProjectFile.__members__.keys()))],
-        typer.Argument(help='不提供责初始化所有项目文件。否则按照提供的项目文件 KEY 单独处理。'),
+        typer.Argument(
+            help='不提供责初始化所有项目文件。否则按照提供的项目文件 KEY 单独处理。'
+        ),
     ] = None,
     rename: Annotated[bool, typer.Option(help='若目标文件存在则重命名。')] = False,
 ):
@@ -226,7 +234,9 @@ def main_setup(ctx: typer.Context):
 @sub_venv.command('update')
 def venv_update(
     ctx: typer.Context,
-    name: Annotated[list[str], typer.Argument(help='指定希望更新的 pip 包名称。')] = None,
+    name: Annotated[
+        list[str], typer.Argument(help='指定希望更新的 pip 包名称。')
+    ] = None,
     init: Annotated[bool, typer.Option(help='是否初始化虚拟环境。')] = False,
     requirements: Annotated[
         str, typer.Option(help='指定 requirements.txt 的相对路径。')
@@ -266,7 +276,9 @@ def uwsgi_top(
 
 @sub_conf.callback()
 def conf_main_callback(
-    force: Annotated[bool, typer.Option('--force', '-f', help='覆盖已存在的文件。')] = False,
+    force: Annotated[
+        bool, typer.Option('--force', '-f', help='覆盖已存在的文件。')
+    ] = False,
 ):
     global_state.force = force
 
@@ -276,9 +288,13 @@ def conf_make(
     ctx: typer.Context,
     file: Annotated[
         list[MainConfigFile],
-        typer.Argument(help='提供支持的配置文件名称。', show_default=False, show_choices=True),
+        typer.Argument(
+            help='提供支持的配置文件名称。', show_default=False, show_choices=True
+        ),
     ],
-    env_postfix: Annotated[bool, typer.Option(help='在生成的配置文件名称末尾加上环境名称后缀。')] = False,
+    env_postfix: Annotated[
+        bool, typer.Option(help='在生成的配置文件名称末尾加上环境名称后缀。')
+    ] = False,
 ):
     """「本地」生成配置文件。"""
     pyape_conf = check_pyape_toml(ctx)
