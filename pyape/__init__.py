@@ -4,4 +4,4 @@ The Python Application Programming Environment.
 
 """
 
-__version__ = '0.4.0'
+__version__ = '26.18.1'
